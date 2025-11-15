@@ -4,11 +4,13 @@ from flask import Flask, render_template, Response, request
 import src.videochat
 from src.login import login
 from src.signup import signup
+from flask_jwt_extended import create_access_token
 
 
 # Create a Flask app instance
 app = Flask(__name__, static_url_path='/static')
 app.config['SECRET_KEY'] = 'secret!'
+app.config['JWT_SECRET_KEY'] = 'password'
 
 socketio = SocketIO(app)
 
@@ -69,10 +71,10 @@ def post_signup():
 def post_login():
     email= request.json.get('email')
     password = request.json.get('password')
-    user_id = login(email, password)
-    if user_id is None:
+    token = login(email, password)
+    if token is None:
         return {'error': 'Incorrect username or password'}, 401
-    return {'user_id': user_id}, 200
+    return {'token': token}, 200
 
 if __name__ == "__main__":
 

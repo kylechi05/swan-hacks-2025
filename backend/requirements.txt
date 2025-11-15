@@ -3,3 +3,4 @@ opencv-python
 aiortc
 flask-socketio
 flask-cors
+flask-jwt-extended
