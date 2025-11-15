@@ -5,7 +5,7 @@ def signup(name, email, password):
         insert = """
             insert into user (email, password, name) VALUES (?, ?, ?);
         """
-        conn = sqlite3.connect("database.db")
+        conn = sqlite3.connect("./src/database.db")
         cursor = conn.cursor()
         cursor.execute(insert, (email, password, name))
         conn.commit()

@@ -3,7 +3,7 @@ from flask_jwt_extended import create_access_token, decode_token
 from datetime import datetime, timedelta
 
 def login(email, password):
-    conn = sqlite3.connect("database.db")
+    conn = sqlite3.connect("./src/database.db")
     try:
         get_user_id = """
             select *

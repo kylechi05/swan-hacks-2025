@@ -6,14 +6,48 @@ export function SignIn() {
         password: "",
     });
 
-    const handleSubmit = (e) => {
+    const [error, setError] = useState("");
+
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        // route for login
+        setError("");
+
+        try {
+            const res = await fetch("http://localhost:6969/login", {
+                method: "POST", // POST request
+                headers: {
+                    "Content-Type": "application/json", // tell server it's JSON
+                },
+                body: JSON.stringify({
+                    email: formState.email,
+                    password: formState.password,
+                }),
+            });
+
+            if (!res.ok) {
+                // If server returned an error
+                const errorData = await res.json();
+                setError(
+                    errorData.message || "Incorrect username or password.",
+                );
+                return;
+            }
+
+            const data = await res.json();
+            console.log("Server response:", data);
+            console.log(data);
+        } catch (err) {
+            console.error("Request failed:", err);
+            setError("Failed to connect to server.");
+        }
     };
 
     return (
-        <div className="flex flex-col items-center w-full">
-            <form onSubmit={handleSubmit} className="flex flex-col gap-4 w-full max-w-sm">
+        <div className="flex w-full flex-col items-center">
+            <form
+                onSubmit={handleSubmit}
+                className="flex w-full max-w-sm flex-col gap-4"
+            >
                 <input
                     type="email"
                     placeholder="Email"
@@ -38,17 +72,20 @@ export function SignIn() {
                             password: e.target.value,
                         }))
                     }
-                    className="rounded-lg border-(--primary-border-color) border p-2"
+                    className="rounded-lg border border-(--primary-border-color) p-2"
                     required
                 />
 
                 <button
                     type="submit"
-                    className="transition-all cursor-pointer rounded-lg hover:bg-blue-600 bg-blue-500 px-4 py-2 text-white hover:scale-105"
+                    className="cursor-pointer rounded-lg bg-blue-500 px-4 py-2 text-white transition-all hover:scale-105 hover:bg-blue-600"
                 >
                     Sign In
                 </button>
             </form>
+            {error && (
+                <p className="text-sm font-medium text-red-500">{error}</p>
+            )}
         </div>
     );
 }

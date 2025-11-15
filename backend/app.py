@@ -1,16 +1,23 @@
 
 from flask_socketio import SocketIO, send, emit, join_room, leave_room
 from flask import Flask, render_template, Response, request
+from flask_cors import CORS
 import src.videochat
 from src.login import login
 from src.signup import signup
-from flask_jwt_extended import create_access_token
+from flask_jwt_extended import create_access_token, JWTManager
 
 
 # Create a Flask app instance
 app = Flask(__name__, static_url_path='/static')
 app.config['SECRET_KEY'] = 'secret!'
 app.config['JWT_SECRET_KEY'] = 'password'
+
+# Enable CORS
+CORS(app)
+
+# Initialize JWT
+jwt = JWTManager(app)
 
 socketio = SocketIO(app)
 
@@ -63,7 +70,7 @@ def post_signup():
     password = request.json.get('password')
     try:
         signup(name, email, password)
-        return 200
+        return {"status": 200}
     except Exception as e:
         return {'error': f'Something went wrong - {e}'}, 500
 

@@ -22,7 +22,7 @@ export default function RootLayout({
     return (
         <html lang="en">
             <body
-                className={`${montserrat.variable} font-montserrat antialiased bg-(--background)`}
+                className={`${montserrat.variable} font-montserrat antialiased bg-(--background) relative`}
             >
                 <NavBar />
                 {children}

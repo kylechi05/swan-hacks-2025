@@ -1,5 +1,5 @@
 export default function TutorEvent() {
     return (
-        <div className=""></div>
+        <div className="text-(--off-white)">tutoring page</div>
     )
 }
