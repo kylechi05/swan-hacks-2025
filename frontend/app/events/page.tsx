@@ -1,15 +1,40 @@
+import Link from "next/link";
+
 export default function EventsPage() {
     return (
-        <div className="flex flex-col py-20 px-50 text-(--off-white)">
-            <div>
-                Request Help
-                <div>
-                    Create Event
+        <div className="flex min-h-screen flex-col gap-16 bg-(--background) px-36 py-20 text-(--off-white)">
+            <h1 className="text-center text-4xl font-semibold">Events</h1>
+            <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+                {/* Request Help Card */}
+                <div className="flex h-64 flex-col gap-4 rounded-2xl border border-(--primary-border-color) p-8">
+                    <h2 className="text-2xl font-semibold">Request Help</h2>
+                    <p className="text-(--light-gray)">
+                        Need assistance? Create a session and get matched with a
+                        tutor.
+                    </p>
+                    <Link
+                        href="/events/create"
+                        className="mt-auto cursor-pointer rounded-lg bg-blue-600 px-4 py-2 text-center text-white transition-all hover:scale-105 hover:bg-blue-500"
+                    >
+                        Create Event
+                    </Link>
+                </div>
+
+                {/* Tutor Others Card */}
+                <div className="flex h-64 flex-col gap-4 rounded-2xl border border-(--primary-border-color) p-8">
+                    <h2 className="text-2xl font-semibold">Tutor Others</h2>
+                    <p className="text-(--light-gray)">
+                        Want to help others? Sign up as a tutor and start
+                        teaching.
+                    </p>
+                    <Link
+                        href="/events/tutor"
+                        className="mt-auto cursor-pointer rounded-lg bg-green-600 px-4 py-2 text-center text-white transition-all hover:scale-105 hover:bg-green-500"
+                    >
+                        Sign Up to Tutor
+                    </Link>
                 </div>
             </div>
-            <div>
-                Tutor Others
-            </div>
         </div>
-  );
+    );
 }

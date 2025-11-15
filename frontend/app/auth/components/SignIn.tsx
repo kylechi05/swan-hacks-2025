@@ -24,7 +24,8 @@ export function SignIn() {
                             email: e.target.value,
                         }))
                     }
-                    className="rounded border p-2"
+                    className="rounded-lg border border-(--primary-border-color) p-2"
+                    required
                 />
 
                 <input
@@ -37,12 +38,13 @@ export function SignIn() {
                             password: e.target.value,
                         }))
                     }
-                    className="rounded border p-2"
+                    className="rounded-lg border-(--primary-border-color) border p-2"
+                    required
                 />
 
                 <button
                     type="submit"
-                    className="transition-all cursor-pointer rounded hover:bg-blue-500 bg-blue-400 px-4 py-2 text-white hover:scale-105"
+                    className="transition-all cursor-pointer rounded-lg hover:bg-blue-600 bg-blue-500 px-4 py-2 text-white hover:scale-105"
                 >
                     Sign In
                 </button>
