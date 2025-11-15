@@ -1,11 +1,20 @@
-import Link from "next/link"
+import Link from "next/link";
 
 export function NavBar() {
     return (
-        <div className="flex flex-row items-center h-16 bg-(--background)/80 text-(--light-gray) px-32 gap-20 transition-all border-b border-(--primary-border-color)">
-            <Link href="/" className="text-(--off-white) text-xl">TutorLink</Link>
-            <Link href="/events" className="hover:text-(--off-white)">Events</Link>
-            <Link href="/auth" className="hover:text-(--off-white) ml-auto">Sign in</Link>
+        <div className="flex h-16 text-sm  flex-row items-center gap-20 border-b border-(--primary-border-color) bg-(--background)/80 px-32 text-(--light-gray) transition-all">
+            <Link href="/" className="text-xl text-(--off-white)">
+                TutorLink
+            </Link>
+            <Link href="/events" className="hover:text-(--off-white)">
+                Events
+            </Link>
+            <Link href="/join-meeting" className="hover:text-(--off-white)">
+                Join Meeting
+            </Link>
+            <Link href="/auth" className="ml-auto hover:text-(--off-white)">
+                Sign in
+            </Link>
         </div>
-    )
+    );
 }
