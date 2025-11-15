@@ -112,9 +112,5 @@ def post_login():
     return {'user_id': user_id}, 200
 
 if __name__ == "__main__":
-    # For HTTPS (required for getUserMedia on non-localhost)
-    # Generate with: openssl req -x509 -newkey rsa:4096 -nodes -out cert.pem -keyout key.pem -days 365
-    # For development, use 'adhoc' to auto-generate self-signed cert
-    socketio.run(app, debug=True, host='0.0.0.0', port=6969, 
-                 ssl_context='adhoc')  # Remove ssl_context for HTTP-only
+    socketio.run(app, debug=True, host='0.0.0.0', port=6969)
 
