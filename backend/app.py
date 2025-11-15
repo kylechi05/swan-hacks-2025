@@ -5,6 +5,7 @@ from flask_cors import CORS
 import src.videochat
 from src.login import login
 from src.signup import signup
+from src.subjects import subjects
 from flask_jwt_extended import create_access_token, JWTManager
 
 
@@ -82,6 +83,13 @@ def post_login():
     if token is None:
         return {'error': 'Incorrect username or password'}, 401
     return {'token': token}, 200
+
+@app.route('/subjects', methods=['GET'])
+def get_subjects():
+    try:
+        return {'subjects': subjects()}, 200
+    except Exception as e:
+        return {'error': f'Error: {e}'}, 500
 
 if __name__ == "__main__":
 
