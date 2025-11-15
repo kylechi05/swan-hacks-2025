@@ -1,10 +1,26 @@
-from flask import Flask
+from flask import Flask, render_template, Response, request, jsonify
+import src.videochat
 
-app = Flask(__name__)
+
+# Create a Flask app instance
+app = Flask(__name__, static_url_path='/static')
+camera = src.videochat.VideoCamera()
+
+# Set to keep track of RTCPeerConnection instances
+pcs = set()
 
 @app.route('/')
-def hello_world():
-    return 'Hello, World!'
+def index():
+    return render_template('index.html')
 
-if __name__ == '__main__':
-    app.run(debug=True)
+@app.route('/offer', methods=['POST'])
+def offer():
+    return src.videochat.offer()
+
+@app.route('/video_feed')
+def video_feed():
+    return Response(src.videochat.gen(camera),
+                    mimetype='multipart/x-mixed-replace; boundary=frame')
+
+if __name__ == "__main__":
+    app.run(debug=True, host='0.0.0.0', port=6969)
