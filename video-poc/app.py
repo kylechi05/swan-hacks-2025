@@ -1,4 +1,4 @@
-
+import logging
 from flask_socketio import SocketIO, send, emit, join_room, leave_room
 from flask import Flask, render_template, Response, request
 import src.videochat
@@ -18,19 +18,38 @@ camera = src.videochat.VideoCamera()
 # TODO: Move users to DB, or find better way to handle what users are in what rooms
 users = {}
 
+# Track rooms and their members
+rooms = {}
+
 # Set to keep track of RTCPeerConnection instances
 pcs = set()
+
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
+@app.route('/meeting/<eid>') 
+def meeting(eid):
+    return render_template('meeting.html', eid=eid)
+
 # Handle new user joining
 @socketio.on('join')
-def handle_join(username):
-    users[request.sid] = username  # Store username by session ID
-    join_room(username)  # Each user gets their own "room"
-    emit("message", f"{username} joined the chat", room=username)
+def handle_join(eid):
+    users[request.sid] = eid  # Store eid by session ID
+    join_room(eid)
+    
+    # Track room members
+    if eid not in rooms:
+        rooms[eid] = []
+    rooms[eid].append(request.sid)
+    
+    logging.info(f"User {request.sid} joined room {eid}. Room has {len(rooms[eid])} members.")
+    
+    # If this is the second person joining, notify both peers they can start
+    if len(rooms[eid]) == 2:
+        emit('peer-ready', room=eid, include_self=True)
+        logging.info(f"Two peers in room {eid}, signaling peer-ready")
 
 # Handle user messages
 @socketio.on('message')
@@ -41,13 +60,31 @@ def handle_message(data):
 # Handle disconnects
 @socketio.on('disconnect')
 def handle_disconnect():
-    username = users.pop(request.sid, "Anonymous")
-    emit("message", f"{username} left the chat", broadcast=True)
+    sid = request.sid
+    eid = users.pop(sid, None)
+    
+    if eid and eid in rooms:
+        if sid in rooms[eid]:
+            rooms[eid].remove(sid)
+        if len(rooms[eid]) == 0:
+            del rooms[eid]
+    
+    emit("message", f"User left the chat", room=eid)
 
 
-@app.route('/offer', methods=['POST'])
-def offer():
-    return src.videochat.offer()
+
+@socketio.on('offer')
+def handle_offer(data):
+    emit('offer', data, room=users[request.sid], skip_sid=request.sid)
+
+@socketio.on('answer')
+def handle_answer(data):
+    emit('answer', data, room=users[request.sid], skip_sid=request.sid)
+
+@socketio.on('ice-candidate')
+def handle_ice_candidate(data):
+    emit('ice-candidate', data, room=users[request.sid], skip_sid=request.sid)
+
 
 @app.route('/video_feed')
 def video_feed():
@@ -75,5 +112,9 @@ def post_login():
     return {'user_id': user_id}, 200
 
 if __name__ == "__main__":
-    socketio.run(app, debug=True, host='0.0.0.0', port=6969)
+    # For HTTPS (required for getUserMedia on non-localhost)
+    # Generate with: openssl req -x509 -newkey rsa:4096 -nodes -out cert.pem -keyout key.pem -days 365
+    # For development, use 'adhoc' to auto-generate self-signed cert
+    socketio.run(app, debug=True, host='0.0.0.0', port=6969, 
+                 ssl_context='adhoc')  # Remove ssl_context for HTTP-only
 
