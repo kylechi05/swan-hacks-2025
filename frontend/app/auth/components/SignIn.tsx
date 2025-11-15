@@ -1,6 +1,9 @@
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export function SignIn() {
+    const router = useRouter();
+
     const [formState, setFormState] = useState({
         email: "",
         password: "",
@@ -34,8 +37,8 @@ export function SignIn() {
             }
 
             const data = await res.json();
-            console.log("Server response:", data);
-            console.log(data);
+            localStorage.setItem("token", data.token);
+            router.push("/"); 
         } catch (err) {
             console.error("Request failed:", err);
             setError("Failed to connect to server.");
