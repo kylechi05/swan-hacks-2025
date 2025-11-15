@@ -2,5 +2,14 @@
 @custom-variant hover (&:hover);
 
 @theme {
-  --font-montserrat: var(--font-montserrat);
+    --font-montserrat: var(--font-montserrat);
+}
+
+:root {
+  --background: #0a0a0a;
+  --light-gray: #aaaaaa;
+  --primary-border-color: #505050;
+
+  --off-white: #e8e8e8;
+
 }

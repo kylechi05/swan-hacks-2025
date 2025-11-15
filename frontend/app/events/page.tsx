@@ -1,9 +1,12 @@
-export default function Events() {
-  return (
-    <div className="flex min-h-screen">
-      <main className="">
-        <div>
-          Events Page
+export default function EventsPage() {
+    return (
+        <div className="flex flex-col py-20 px-50">
+            <div>
+                Request Help
+            </div>
+            <div>
+
+            </div>
         </div>
       </main>
     </div>
