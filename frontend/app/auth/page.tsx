@@ -1,3 +1,7 @@
-export function AuthPage() {
-    
+export default function AuthPage() {
+    return (
+        <div>
+            Auth Page
+        </div>
+    )
 }
