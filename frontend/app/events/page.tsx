@@ -8,5 +8,5 @@ export default function EventsPage() {
 
             </div>
         </div>
-    )
+  );
 }

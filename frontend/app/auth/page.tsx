@@ -9,7 +9,7 @@ export default function AuthPage() {
     const [formMode, setFormMode] = useState("signin");
 
     return (
-        <div className="flex flex-col items-center pt-32 gap-5">
+        <div className="flex flex-col items-center pt-32 gap-5 text-(--off-white)">
             {formMode == "signin" ? (
                 <>
                     <h1 className="text-xl font-medium">Sign In</h1>
