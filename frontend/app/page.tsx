@@ -1,12 +1,9 @@
-
 export default function Home() {
-  return (
-    <div className="flex min-h-screen">
-      <main className="">
-        <div>
-          Home Page
+    return (
+        <div className="flex">
+            <main className="">
+                <div>Home Page</div>
+            </main>
         </div>
-      </main>
-    </div>
-  );
+    );
 }
