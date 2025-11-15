@@ -2,12 +2,12 @@ import Link from "next/link";
 
 export default function Home() {
     return (
-        <div className="space-y-3 text-(--off-white)">
+        <div className="space-y-3 text-(--off-white) py-24">
             <section className="space-y-6 py-12 text-center">
                 <h1 className="mx-auto max-w-3xl text-5xl font-bold text-balance md:text-6xl">
                     Connect with Expert Tutors Anytime, Anywhere
                 </h1>
-                <p className="text-muted-foreground mx-auto max-w-2xl text-xl text-balance">
+                <p className="text-muted-foreground mx-auto max-w-2xl text-xl text-balance text-(--light-gray)">
                     Master any subject with personalized one-on-one tutoring.
                     Learn from verified experts who care about your success.
                 </p>
@@ -18,7 +18,7 @@ export default function Home() {
                     <h2 className="text-3xl font-bold md:text-4xl">
                         How It Works
                     </h2>
-                    <p className="text-muted-foreground mx-auto max-w-2xl">
+                    <p className="text-muted-foreground mx-auto max-w-2xl text-(--light-gray)">
                         Getting started with tutoring is straightforward and
                         simple.
                     </p>
@@ -32,7 +32,7 @@ export default function Home() {
                         <h3 className="text-lg font-semibold">
                             Choose Your Subject
                         </h3>
-                        <p className="text-muted-foreground text-sm leading-relaxed">
+                        <p className="text-muted-foreground text-sm leading-relaxed text-(--light-gray)">
                             Browse hundreds of subjects and find the perfect
                             match for your learning goals
                         </p>
@@ -45,7 +45,7 @@ export default function Home() {
                         <h3 className="text-lg font-semibold">
                             Book a Session
                         </h3>
-                        <p className="text-muted-foreground text-sm leading-relaxed">
+                        <p className="text-muted-foreground text-sm leading-relaxed text-(--light-gray)">
                             Select a time that works for you and book instantly
                             with your chosen tutor
                         </p>
@@ -58,7 +58,7 @@ export default function Home() {
                         <h3 className="text-lg font-semibold">
                             Start Learning
                         </h3>
-                        <p className="text-muted-foreground text-sm leading-relaxed">
+                        <p className="text-muted-foreground text-sm leading-relaxed text-(--light-gray)">
                             Join your video session and start mastering your
                             subject with expert guidance
                         </p>
