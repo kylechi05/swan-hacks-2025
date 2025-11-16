@@ -49,9 +49,9 @@ export default function RecordingsListPage() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-900 text-white">
+        <div className="min-h-screen text-(--off-white)">
             {/* Header */}
-            <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-6 shadow-lg">
+            <div className="bg-gradient-to-r from-green-600 to-blue-600 p-6 shadow-lg">
                 <div className="mx-auto max-w-7xl">
                     <h1 className="text-3xl font-bold">📹 Your Recordings</h1>
                     <p className="mt-2 text-gray-200">
@@ -100,8 +100,8 @@ export default function RecordingsListPage() {
                                 key={meeting.meeting_id}
                                 className="overflow-hidden rounded-xl bg-gray-800 shadow-xl transition hover:scale-105"
                             >
-                                <div className="border-b-2 border-purple-600 bg-gray-700 p-5">
-                                    <h3 className="text-xl font-bold text-purple-400">
+                                <div className="border-b-2 border-green-600 bg-gray-700 p-5">
+                                    <h3 className="text-xl font-bold text-green-500">
                                         Meeting #{meeting.meeting_id.substring(0, 8)}
                                     </h3>
                                     <p className="text-sm text-gray-400">
@@ -135,11 +135,11 @@ export default function RecordingsListPage() {
                                         onClick={() =>
                                             viewSyncedRecording(meeting.meeting_id)
                                         }
-                                        className="w-full rounded-lg bg-purple-600 py-3 font-semibold transition hover:bg-purple-700"
+                                        className="cursor-pointer w-full rounded-lg bg-green-600 py-3 font-semibold transition hover:bg-green-500"
                                     >
                                         {meeting.recordings.length > 1
-                                            ? "🎬 View Synced"
-                                            : "▶️ Play"}
+                                            ? "View Synced 🎬"
+                                            : "Play ▶️"}
                                     </button>
 
                                     <div className="mt-3 flex gap-2">
@@ -148,10 +148,10 @@ export default function RecordingsListPage() {
                                                 key={rec.filename}
                                                 href={`https://api.tutorl.ink/recordings/${rec.filename}`}
                                                 download
-                                                className="flex-1 rounded-lg bg-green-600 py-2 text-center text-sm font-semibold transition hover:bg-green-700"
+                                                className="flex-1 rounded-lg border-2 border-blue-600 hover:bg-blue-600 py-2 text-center text-sm font-semibold transition "
                                                 title={`Download Participant ${idx + 1}`}
                                             >
-                                                ⬇️
+                                                Download ⬇️
                                             </a>
                                         ))}
                                     </div>
@@ -162,17 +162,17 @@ export default function RecordingsListPage() {
                 )}
 
                 {/* Info Card */}
-                <div className="mt-8 rounded-xl border-2 border-purple-600 bg-purple-900/20 p-6">
-                    <h3 className="mb-4 text-xl font-bold text-purple-400">
+                <div className="mt-8 rounded-xl border-2 border-green-600 bg-green-900/20 p-6">
+                    <h3 className="mb-4 text-xl font-bold text-green-400">
                         ℹ️ About Recordings
                     </h3>
                     <div className="space-y-2 text-gray-300">
                         <p>
                             • Each meeting is automatically recorded from both
-                            participants' perspectives
+                            participants&apos; perspectives
                         </p>
                         <p>
-                            • Click "View Synced" to watch both videos
+                            • Click &quot;View Synced&quot; to watch both videos
                             side-by-side in perfect sync
                         </p>
                         <p>
