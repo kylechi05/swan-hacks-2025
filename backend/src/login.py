@@ -1,36 +1,38 @@
-import sqlite3
+from src.models import User
+from src.database import get_db
 from flask_jwt_extended import create_access_token, decode_token
-from datetime import datetime, timedelta
+from datetime import timedelta
+
 
 def login(email, password):
-    conn = sqlite3.connect("./src/database.db")
-    try:
-        get_user_id = """
-            select *
-            from user
-            where email = ?
-            and password = ?
-        """
-        cursor = conn.cursor()
+    """
+    Authenticate user and return JWT token.
+    
+    Args:
+        email: User's email
+        password: User's password (plain text)
         
-        cursor.execute(get_user_id, (email, password))
-        result = cursor.fetchone()
-        print(result)
-        if result:
+    Returns:
+        JWT token if successful, None otherwise
+    """
+    with get_db() as db:
+        user = db.query(User).filter(User.email == email, User.password == password).first()
+        
+        if user:
             additional_claims = {
-                'userid': result[0],
-                'email': result[1],
-                'name': result[3]
+                'userid': user.userid,
+                'email': user.email,
+                'name': user.name
             }
             token = create_access_token(
-                identity=str(result[0]),  # Convert to string for JWT subject claim
+                identity=str(user.userid),  # Convert to string for JWT subject claim
                 additional_claims=additional_claims,
                 expires_delta=timedelta(hours=36)
             )
             return token
+        
         return None
-    finally:
-        conn.close()
+
         
 if __name__ == '__main__':
     token = login('carlotran4@gmail.com', '1234')

@@ -1,10 +1,18 @@
-import sqlite3
+from src.models import Subject
+from src.database import get_db
+
 
 def subjects():
-    conn = sqlite3.connect("./src/database.db")
-    cursor = conn.cursor()
-    cursor.execute('select * from subjects')
-    projects = [x[0] for x in cursor.fetchall()]
-    conn.close()
+    """
+    Get all available subjects.
     
-    return projects
+    Returns:
+        List of subject names
+    """
+    with get_db() as db:
+        all_subjects = db.query(Subject.subject).all()
+        return [subject[0] for subject in all_subjects]
+
+
+if __name__ == "__main__":
+    print(subjects())

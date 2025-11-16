@@ -7,6 +7,7 @@ from src.signup import signup
 from src.subjects import subjects
 from flask_jwt_extended import create_access_token, JWTManager, get_jwt_identity, jwt_required
 from src.create_event import create_event
+from src.database import init_db, close_db_session
 
 
 # Create a Flask app instance
@@ -21,6 +22,17 @@ CORS(app)
 
 # Initialize JWT
 jwt = JWTManager(app)
+
+# Initialize database
+with app.app_context():
+    init_db()
+
+socketio = SocketIO(app)
+
+# Cleanup database session after each request
+@app.teardown_appcontext
+def shutdown_session(exception=None):
+    close_db_session()
 
 socketio = SocketIO(app)
 

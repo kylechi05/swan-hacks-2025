@@ -1,5 +1,7 @@
-import sqlite3
+from src.models import RequestedEvent
+from src.database import get_db
 from datetime import datetime
+
 
 def create_event(
     userid_tutee,
@@ -9,37 +11,65 @@ def create_event(
     title,
     description
 ):
+    """
+    Create a new tutoring event request.
+    
+    Args:
+        userid_tutee: ID of the student requesting tutoring
+        available_start: Unix timestamp for start time
+        available_end: Unix timestamp for end time
+        category: Subject category
+        title: Event title
+        description: Event description
+        
+    Returns:
+        Event ID of the created event
+    """
     print(f"create_event called with: userid={userid_tutee}, start={available_start}, end={available_end}")
-    conn = sqlite3.connect('./src/database.db')
-    cursor = conn.cursor()
-    try:
+    
+    with get_db() as db:
+        # Convert Unix timestamps to datetime objects
         available_start_time = datetime.fromtimestamp(available_start)
         available_end_time = datetime.fromtimestamp(available_end)
         
         print(f"Converted times: start={available_start_time}, end={available_end_time}")
-
-        cursor.execute('''
-            insert into requested_event (
-            userid_tutee,
-            available_start_time,
-            available_end_time,
-            category,
-            title,
-            description
-            ) values (?, ?, ?, ?, ?, ?)
-        ''', 
-        (userid_tutee, available_start_time, available_end_time, category, title, description)
+        
+        # Create new event
+        new_event = RequestedEvent(
+            userid_tutee=userid_tutee,
+            available_start_time=available_start_time,
+            available_end_time=available_end_time,
+            category=category,
+            title=title,
+            description=description,
+            is_accepted=False,
+            is_deleted=False
         )
         
-        eid = cursor.lastrowid
-        conn.commit()
+        db.add(new_event)
+        db.flush()  # Flush to get the eventid
         
+        eid = new_event.eventid
         print(f"Event created with id: {eid}")
+        
         return eid
-    except Exception as e:
-        print(f"Error in create_event: {e}")
-        raise
-    finally:
-        conn.close()
+
+
+if __name__ == "__main__":
+    # Test the function
+    from datetime import datetime
+    import time
     
+    # Create a test event
+    start = int(time.time()) + 3600  # 1 hour from now
+    end = start + 7200  # 2 hours duration
     
+    eid = create_event(
+        userid_tutee=1,
+        available_start=start,
+        available_end=end,
+        category="Mathematics",
+        title="Need help with calculus",
+        description="Having trouble with integration"
+    )
+    print(f"Created event with ID: {eid}")
