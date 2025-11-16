@@ -17,7 +17,7 @@ RECORDINGS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'recor
 os.makedirs(RECORDINGS_DIR, exist_ok=True)
 
 
-def save_recording_blob(meeting_id: str, participant_id: str, blob_data: bytes, file_extension: str = 'webm') -> str:
+def save_recording_blob(meeting_id: str, participant_id: str, blob_data: bytes, file_extension: str = 'mp4') -> str:
     """
     Save uploaded recording blob to disk.
     
@@ -56,10 +56,8 @@ async def process_uploaded_recording(meeting_id: str, participant_id: str, filep
         
         logger.info(f"Starting background transcription for {filepath}")
         
-        # Run transcription in a thread pool to avoid blocking
-        loop = asyncio.get_event_loop()
-        transcript_path = await loop.run_in_executor(
-            None,
+        # Run transcription in a worker thread (asyncio.to_thread) to avoid blocking
+        transcript_path = await asyncio.to_thread(
             transcription_service.process_recording,
             filepath,
             meeting_id,

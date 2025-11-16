@@ -2,6 +2,7 @@ import logging
 import asyncio
 import os
 import json
+import subprocess
 from datetime import datetime
 from flask_socketio import SocketIO, send, emit, join_room, leave_room
 from flask import Flask, render_template, Response, request, send_from_directory, jsonify
@@ -686,33 +687,68 @@ def upload_recording():
         video_file = request.files['video']
         if video_file.filename == '':
             return jsonify({'error': 'Empty filename'}), 400
-        
-        # Determine file extension from mimetype or filename
-        file_extension = 'webm'  # default
-        if video_file.content_type:
-            if 'webm' in video_file.content_type:
-                file_extension = 'webm'
-            elif 'mp4' in video_file.content_type:
-                file_extension = 'mp4'
-        
+
+        original_content_type = video_file.content_type or 'unknown'
+        logger.info(f"Incoming recording upload: meeting_id={meeting_id} participant_id={participant_id} content_type={original_content_type} filename={video_file.filename}")
+
         # Read the blob data
         blob_data = video_file.read()
-        
+
         if len(blob_data) == 0:
             return jsonify({'error': 'Empty video file'}), 400
-        
-        # Save the recording
-        filepath = save_recording_blob(meeting_id, participant_id, blob_data, file_extension)
-        
-        # Trigger transcription in background
-        asyncio.create_task(process_uploaded_recording(meeting_id, participant_id, filepath))
-        
-        logger.info(f"Successfully uploaded recording for meeting {meeting_id}, participant {participant_id}")
-        
+
+        # Force mp4 storage. If incoming is webm, convert after temp save
+        incoming_ext = 'webm' if 'webm' in original_content_type or video_file.filename.lower().endswith('.webm') else 'mp4'
+
+        if incoming_ext == 'mp4':
+            filepath = save_recording_blob(meeting_id, participant_id, blob_data, 'mp4')
+        else:
+            temp_path = save_recording_blob(meeting_id, participant_id, blob_data, 'webm')
+            base_name = os.path.splitext(os.path.basename(temp_path))[0]
+            final_filename = base_name + '.mp4' if not base_name.endswith('.mp4') else base_name
+            final_path = os.path.join(os.path.dirname(temp_path), final_filename)
+            convert_cmd = [
+                'ffmpeg', '-y', '-i', temp_path,
+                '-c:v', 'copy',
+                '-c:a', 'aac',
+                final_path
+            ]
+            try:
+                logger.info(f"Converting webm to mp4: {' '.join(convert_cmd)}")
+                result = subprocess.run(convert_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120)
+                if result.returncode != 0:
+                    logger.warning(f"ffmpeg conversion failed; keeping webm. stderr={result.stderr.decode(errors='ignore')[:300]}")
+                    filepath = temp_path
+                else:
+                    filepath = final_path
+                    try:
+                        os.remove(temp_path)
+                    except OSError:
+                        pass
+            except Exception as conv_err:
+                logger.error(f"Exception during conversion: {conv_err}")
+                filepath = temp_path
+
+        size_bytes = len(blob_data)
+        logger.info(f"Saved recording file at {filepath} size={size_bytes}B (~{size_bytes/(1024*1024):.2f} MB)")
+
+        # Background transcription using thread + asyncio.run to isolate
+        try:
+            import threading
+            threading.Thread(target=lambda: asyncio.run(process_uploaded_recording(meeting_id, participant_id, filepath)), daemon=True).start()
+        except Exception as sched_err:
+            logger.error(f"Failed to schedule transcription: {sched_err}")
+
         return jsonify({
             'success': True,
+            'meeting_id': meeting_id,
+            'participant_id': participant_id,
+            'filename': os.path.basename(filepath),
             'filepath': filepath,
-            'size': len(blob_data),
+            'size_bytes': size_bytes,
+            'size_mb': f"{size_bytes/(1024*1024):.2f}",
+            'content_type_in': original_content_type,
+            'stored_extension': 'mp4' if filepath.lower().endswith('.mp4') else 'webm',
             'message': 'Recording uploaded successfully'
         }), 200
         
