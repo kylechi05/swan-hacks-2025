@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text, ForeignKey
+from sqlalchemy import JSON, Column, Integer, String, DateTime, Boolean, Text, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -16,7 +16,7 @@ class User(Base):
     
     # Relationships
     requested_events = relationship('RequestedEvent', back_populates='tutee', foreign_keys='RequestedEvent.userid_tutee')
-    tutor_events = relationship('RequestedEvent', back_populates='tutor', foreign_keys='RequestedEvent.uid_tutor')
+    tutor_events = relationship('RequestedEvent', back_populates='tutor', foreign_keys='RequestedEvent.userid_tutor')
     
     def __repr__(self):
         return f"<User(userid={self.userid}, email='{self.email}', name='{self.name}')>"
@@ -25,11 +25,10 @@ class User(Base):
 class Subject(Base):
     __tablename__ = 'subjects'
     
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    subject = Column(String(255), nullable=False, unique=True)
+    subject = Column(String(255), nullable=False, unique=True, primary_key=True)
     
     def __repr__(self):
-        return f"<Subject(id={self.id}, subject='{self.subject}')>"
+        return f"<Subject(subject='{self.subject}')>"
 
 
 class RequestedEvent(Base):
@@ -42,14 +41,14 @@ class RequestedEvent(Base):
     category = Column(String(255), nullable=False)
     title = Column(String(500), nullable=False)
     description = Column(Text)
-    uid_tutor = Column(Integer, ForeignKey('user.userid'), nullable=True, index=True)
-    possible_tutors = Column(Text)  # JSON string of possible tutor IDs
+    userid_tutor = Column(Integer, ForeignKey('user.userid'), nullable=True, index=True)
+    possible_tutors = Column(JSON,nullable = True)  # JSON string of possible tutor IDs
     is_accepted = Column(Boolean, default=False)
     is_deleted = Column(Boolean, default=False)
     
     # Relationships
     tutee = relationship('User', back_populates='requested_events', foreign_keys=[userid_tutee])
-    tutor = relationship('User', back_populates='tutor_events', foreign_keys=[uid_tutor])
+    tutor = relationship('User', back_populates='tutor_events', foreign_keys=[userid_tutor])
     meetings = relationship('Meeting', back_populates='event')
     
     def __repr__(self):
@@ -59,8 +58,7 @@ class RequestedEvent(Base):
 class Meeting(Base):
     __tablename__ = 'meeting'
     
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    eventid = Column(Integer, ForeignKey('requested_event.eventid'), nullable=False, index=True)
+    eventid = Column(Integer, ForeignKey('requested_event.eventid'), nullable=False, index=True, primary_key=True)
     start_time = Column(DateTime, nullable=False)
     end_time = Column(DateTime, nullable=False)
     

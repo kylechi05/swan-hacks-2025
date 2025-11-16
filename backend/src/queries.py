@@ -32,7 +32,7 @@ def get_events_by_tutor(userid_tutor, include_deleted=False):
     """Get all events assigned to a specific tutor"""
     with get_db() as db:
         query = db.query(RequestedEvent).filter(
-            RequestedEvent.uid_tutor == userid_tutor
+            RequestedEvent.userid_tutor == userid_tutor
         )
         
         if not include_deleted:
@@ -70,7 +70,7 @@ def accept_event(eventid, userid_tutor):
         if event.is_accepted:
             raise ValueError(f"Event {eventid} is already accepted")
         
-        event.uid_tutor = userid_tutor
+        event.userid_tutor = userid_tutor
         event.is_accepted = True
         db.flush()
         

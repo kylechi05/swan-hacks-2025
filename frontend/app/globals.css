@@ -3,6 +3,8 @@
 
 @theme {
     --font-montserrat: var(--font-montserrat);
+    --font-elms-sans: var(--font-elms-sans);
+    --font-noto-sans: var(--font-noto-sans);
 }
 
 :root {
