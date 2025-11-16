@@ -10,6 +10,7 @@ export default function MeetingPage() {
     const params = useParams();
     const meetingId = params.id as string;
     const { user } = useAuth();
+    const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:6969';
 
     const [isConnected, setIsConnected] = useState(false);
     const [memberCount, setMemberCount] = useState(0);
@@ -165,6 +166,7 @@ export default function MeetingPage() {
                 screenStreamRef.current.getTracks().forEach((t) => t.stop());
             if (pcRef.current) pcRef.current.close();
             if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+                try { mediaRecorderRef.current.requestData(); } catch {}
                 mediaRecorderRef.current.stop();
             }
             socket.disconnect();
@@ -409,10 +411,10 @@ export default function MeetingPage() {
             const formData = new FormData();
             formData.append('video', blob, `recording.${mimeType.includes('mp4') ? 'mp4' : 'webm'}`);
             formData.append('meeting_id', meetingId);
-            formData.append('participant_id', socketRef.current?.id || 'unknown');
+            formData.append('participant_id', (user?.userid?.toString() || socketRef.current?.id || 'unknown'));
             
-            // Upload to server
-            const response = await fetch('https://api.tutorl.ink/api/recordings/upload', {
+            // Upload to server (configurable base URL)
+            const response = await fetch(`${API_BASE}/api/recordings/upload`, {
                 method: 'POST',
                 body: formData,
             });
@@ -516,6 +518,7 @@ export default function MeetingPage() {
     const handleHangup = () => {
         // Stop recording before cleanup
         if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+            try { mediaRecorderRef.current.requestData(); } catch {}
             mediaRecorderRef.current.stop();
         }
         
@@ -634,4 +637,4 @@ export default function MeetingPage() {
             </div>
         </div>
     );
-}8
+}
