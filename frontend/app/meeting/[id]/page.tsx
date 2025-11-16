@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { io, Socket } from "socket.io-client";
+import VideoPlayer from "@/app/components/VideoPlayer";
 
 export default function MeetingPage() {
     const params = useParams();
@@ -15,6 +16,7 @@ export default function MeetingPage() {
     const [error, setError] = useState<string | null>(null);
     const [myStream, setMyStream] = useState<MediaStream | null>(null);
     const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+    const [isAudioMute, setIsAudioMute] = useState(false);
 
     const socketRef = useRef<Socket | null>(null);
     const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -128,19 +130,6 @@ export default function MeetingPage() {
             socket.disconnect();
         };
     }, [meetingId]);
-
-    // Update video elements when streams change
-    useEffect(() => {
-        if (remoteVideoRef.current && remoteStream) {
-            remoteVideoRef.current.srcObject = remoteStream;
-        }
-    }, [remoteStream]);
-
-    useEffect(() => {
-        if (localVideoRef.current && myStream) {
-            localVideoRef.current.srcObject = myStream;
-        }
-    }, [myStream]);
 
     const handleOffer = async (data: { sdp: string; type: RTCSdpType }) => {
         try {
@@ -469,22 +458,19 @@ export default function MeetingPage() {
             <div className="relative mx-8 my-6 h-[80vh] overflow-hidden rounded-xl bg-black">
                 {/* Remote Video (main view) */}
                 {remoteStream && (
-                    <video
-                        ref={remoteVideoRef}
-                        autoPlay
-                        playsInline
-                        className="h-full w-full object-contain"
+                    <VideoPlayer 
+                        stream={remoteStream} 
+                        name="Remote Stream" 
+                        isAudioMute={isAudioMute}
                     />
                 )}
 
                 {/* Local Video (picture-in-picture) */}
                 {myStream && (
-                    <video
-                        ref={localVideoRef}
-                        autoPlay
-                        playsInline
-                        muted
-                        className="absolute bottom-6 right-6 h-40 w-52 rounded-lg border-2 border-white object-cover shadow-lg"
+                    <VideoPlayer 
+                        stream={myStream} 
+                        name="My Stream" 
+                        isAudioMute={isAudioMute}
                     />
                 )}
 
