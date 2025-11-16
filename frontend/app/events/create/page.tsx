@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation"
 import { useAuth } from "@/app/authContext";
 
 export default function CreateEvent() {
     const { token } = useAuth();
+    const router = useRouter();
 
     const [form, setForm] = useState({
         title: "",
@@ -59,7 +61,7 @@ export default function CreateEvent() {
             const end = new Date(`${form.endDate}T${form.endTime}:00`);
             const endUnix = Math.floor(end.getTime() / 1000);
 
-            const res = await fetch("http://localhost:6969/create_event", {
+            const res = await fetch("http://localhost:6969/event/create", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -83,7 +85,7 @@ export default function CreateEvent() {
 
             const data = await res.json();
             console.log("Success:", data);
-            alert("Event created successfully!");
+            router.push(`/events/success?event_id=${data.event_id}&from=create`)
         } catch (err) {
             console.error("Request failed:", err);
             setError("Failed to connect to server.");
