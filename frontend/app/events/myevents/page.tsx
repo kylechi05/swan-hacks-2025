@@ -4,14 +4,28 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/app/authContext";
 import { EventDisplay } from "./components/eventDisplay";
 
+function formatDate(date: number | string) {
+    const value = typeof date === "number" ? date * 1000 : date;
+    return new Intl.DateTimeFormat("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+    }).format(new Date(value));
+}
+
 export default function MyEvents() {
     const { token, user } = useAuth();
-    const [tuteeEvents, setTuteeEvents] = useState<any[]>([]);
+
     const [pendingTuteeEvents, setPendingTuteeEvents] = useState([]);
     const [actionTuteeEvents, setActionTuteeEvents] = useState([]);
     const [scheduledTuteeEvents, setScheduledTuteeEvents] = useState([]);
+
     const [pendingTutorEvents, setPendingTutorEvents] = useState([]);
     const [acceptedTutorEvents, setAcceptedTutorEvents] = useState([]);
+
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
 
@@ -22,27 +36,29 @@ export default function MyEvents() {
                     headers: { Authorization: `Bearer ${token}` },
                 });
                 if (!res.ok) throw new Error("Failed to fetch tutee events");
+
                 const data = await res.json();
-                const tuteeEvents = data.events;
-                console.log(tuteeEvents)
+                const events = data.events;
 
-                const pendingTuteeEvents = tuteeEvents.filter(
-                    (e) =>
-                        e.possible_tutors.length === 0 && e.userid_tutor === null,
+                setPendingTuteeEvents(
+                    events.filter(
+                        (e) =>
+                            e.possible_tutors.length === 0 &&
+                            e.userid_tutor === null,
+                    ),
                 );
-                setPendingTuteeEvents(pendingTuteeEvents);
 
-                const actionTuteeEvents = tuteeEvents.filter(
-                    (e) =>
-                        e.possible_tutors.length > 0 &&
-                        e.userid_tutor === null,
+                setActionTuteeEvents(
+                    events.filter(
+                        (e) =>
+                            e.possible_tutors.length > 0 &&
+                            e.userid_tutor === null,
+                    ),
                 );
-                setActionTuteeEvents(actionTuteeEvents);
 
-                const scheduledTuteeEvents = tuteeEvents.filter(
-                    (e) => e.userid_tutor !== null,
+                setScheduledTuteeEvents(
+                    events.filter((e) => e.userid_tutor !== null),
                 );
-                setScheduledTuteeEvents(scheduledTuteeEvents);
             } catch (err: any) {
                 setError(err.message);
             }
@@ -54,21 +70,24 @@ export default function MyEvents() {
                     headers: { Authorization: `Bearer ${token}` },
                 });
                 if (!res.ok) throw new Error("Failed to fetch tutor events");
+
                 const data = await res.json();
-                const tutorEvents = data.events;
-                const pendingTutorEvents = tutorEvents.filter(
-                    (event) =>
-                        event.possible_tutors?.some(
-                            (pt: any) => pt.userid_tutor === user.userid,
-                        ) && event.userid_tutor === null,
+                const events = data.events;
+
+                setPendingTutorEvents(
+                    events.filter(
+                        (event) =>
+                            event.possible_tutors?.some(
+                                (pt: any) => pt.userid_tutor === user.userid,
+                            ) && event.userid_tutor === null,
+                    ),
                 );
 
-                const acceptedTutorEvents = tutorEvents.filter(
-                    (event) => event.userid_tutor === user.userid,
+                setAcceptedTutorEvents(
+                    events.filter(
+                        (event) => event.userid_tutor === user.userid,
+                    ),
                 );
-                console.log(tutorEvents)
-                setPendingTutorEvents(pendingTutorEvents);
-                setAcceptedTutorEvents(acceptedTutorEvents);
             } catch (err: any) {
                 setError(err.message);
             }
@@ -77,7 +96,29 @@ export default function MyEvents() {
         Promise.all([getTuteeEvents(), getTutorEvents()]).finally(() =>
             setLoading(false),
         );
-    }, [token]);
+    }, []);
+
+    const handleSelectTutor = async (eventId: number, tutorId: number) => {
+        try {
+            const res = await fetch(
+                `https://api.tutorl.ink/event/${eventId}/accept`,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({ userid_tutor: tutorId }),
+                },
+            );
+            if (!res.ok) throw new Error("Failed to accept tutor");
+
+            alert("Tutor accepted successfully!");
+            // refresh
+        } catch (err: any) {
+            alert(err.message);
+        }
+    };
 
     if (loading)
         return <div className="text-(--off-white)">Loading events...</div>;
@@ -86,7 +127,6 @@ export default function MyEvents() {
     return (
         <div className="px-18 py-8 text-(--off-white)">
             <h1 className="mb-6 text-2xl">My Events</h1>
-
             <section className="mb-12">
                 <h2 className="mb-4 text-xl">Events I Requested</h2>
 
@@ -102,12 +142,19 @@ export default function MyEvents() {
                                         key={event.eventid}
                                         className="rounded-xl border border-(--primary-border-color) px-6 py-4"
                                     >
-                                        <EventDisplay event={event} />
+                                        <EventDisplay
+                                            event={event}
+                                            startTime={
+                                                event.available_start_time
+                                            }
+                                            endTime={event.available_end_time}
+                                        />
                                     </li>
                                 ))}
                             </ul>
                         )}
                     </div>
+
                     <div>
                         <h3 className="mb-2 text-lg">Action Required</h3>
                         {actionTuteeEvents.length === 0 ? (
@@ -119,12 +166,68 @@ export default function MyEvents() {
                                         key={event.eventid}
                                         className="rounded-xl border border-(--primary-border-color) px-6 py-4"
                                     >
-                                        <EventDisplay event={event} />
+                                        <EventDisplay
+                                            event={event}
+                                            startTime={
+                                                event.available_start_time
+                                            }
+                                            endTime={event.available_end_time}
+                                        >
+                                            <div className="mt-2">
+                                                <h4 className="mb-1 text-sm font-medium">
+                                                    Possible Tutors:
+                                                </h4>
+                                                <ul className="space-y-1">
+                                                    {event.possible_tutors.map(
+                                                        (tutor: any) => (
+                                                            <li
+                                                                key={
+                                                                    tutor.userid_tutor
+                                                                }
+                                                                className="flex items-center justify-between"
+                                                            >
+                                                                <span>
+                                                                    {tutor.name ||
+                                                                        `Tutor ${tutor.userid_tutor}`}
+                                                                </span>
+                                                                <span className="flex flex-col text-xs text-gray-400">
+                                                                    <span>
+                                                                        Start:{" "}
+                                                                        {formatDate(
+                                                                            tutor.start,
+                                                                        )}
+                                                                        {""}
+                                                                    </span>
+                                                                    <span>
+                                                                        End:{" "}
+                                                                        {formatDate(
+                                                                            tutor.end,
+                                                                        )}
+                                                                    </span>
+                                                                </span>
+                                                                <button
+                                                                    className="ml-2 cursor-pointer rounded bg-green-600 px-2 py-1 text-xs text-white hover:bg-green-500"
+                                                                    onClick={() =>
+                                                                        handleSelectTutor(
+                                                                            event.eventid,
+                                                                            tutor.userid_tutor,
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    Select
+                                                                </button>
+                                                            </li>
+                                                        ),
+                                                    )}
+                                                </ul>
+                                            </div>
+                                        </EventDisplay>
                                     </li>
                                 ))}
                             </ul>
                         )}
                     </div>
+
                     <div>
                         <h3 className="mb-2 text-lg">Scheduled</h3>
                         {scheduledTuteeEvents.length === 0 ? (
@@ -136,7 +239,13 @@ export default function MyEvents() {
                                         key={event.eventid}
                                         className="rounded-xl border border-(--primary-border-color) px-6 py-4"
                                     >
-                                        <EventDisplay event={event} />
+                                        <EventDisplay
+                                            event={event}
+                                            startTime={
+                                                event.available_start_time
+                                            }
+                                            endTime={event.available_end_time}
+                                        />
                                     </li>
                                 ))}
                             </ul>
@@ -147,26 +256,37 @@ export default function MyEvents() {
 
             <section>
                 <h2 className="mb-4 text-xl">Events I&apos;m Tutoring</h2>
-                <div className="flex gap-8">
+                <div className="flex gap-16">
                     <div className="w-1/2">
                         <h3 className="mb-2 text-lg">Pending</h3>
                         {pendingTutorEvents.length === 0 ? (
                             <p>No pending events.</p>
                         ) : (
                             <ul className="space-y-4">
-                                {pendingTutorEvents.map((event) => (
-                                    <li
-                                        key={event.eventid}
-                                        className="rounded-xl border border-(--primary-border-color) px-6 py-4"
-                                    >
-                                        <EventDisplay event={event} />
-                                    </li>
-                                ))}
+                                {pendingTutorEvents.map((event) => {
+                                    const tutorSlot =
+                                        event.possible_tutors.find(
+                                            (pt: any) =>
+                                                pt.userid_tutor === user.userid,
+                                        );
+
+                                    return (
+                                        <li
+                                            key={event.eventid}
+                                            className="rounded-xl border border-(--primary-border-color) px-6 py-4"
+                                        >
+                                            <EventDisplay
+                                                event={event}
+                                                startTime={tutorSlot.start}
+                                                endTime={tutorSlot.end}
+                                            />
+                                        </li>
+                                    );
+                                })}
                             </ul>
                         )}
                     </div>
 
-                    {/* Accepted */}
                     <div className="w-1/2">
                         <h3 className="mb-2 text-lg">Scheduled</h3>
                         {acceptedTutorEvents.length === 0 ? (
@@ -178,7 +298,11 @@ export default function MyEvents() {
                                         key={event.eventid}
                                         className="rounded-xl border border-(--primary-border-color) px-6 py-4"
                                     >
-                                        <EventDisplay event={event} />
+                                        <EventDisplay
+                                            event={event}
+                                            startTime={tutorSlot.start}
+                                            endTime={tutorSlot.end}
+                                        />{" "}
                                     </li>
                                 ))}
                             </ul>
