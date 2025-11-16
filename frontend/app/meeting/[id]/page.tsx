@@ -344,8 +344,14 @@ export default function MeetingPage() {
     // ============= Client-Side Recording Functions =============
 
     const getSupportedMimeType = (): string => {
+        // Prioritize H.264 MP4 formats (most compatible)
         const possibleTypes = [
-            'video/mp4;codecs=avc1.64003E,mp4a.40.2',
+            'video/mp4;codecs=avc1.42E01E,mp4a.40.2',  // H.264 Baseline, AAC-LC (most compatible)
+            'video/mp4;codecs=avc1.4D401E,mp4a.40.2',  // H.264 Main, AAC-LC
+            'video/mp4;codecs=avc1.64001E,mp4a.40.2',  // H.264 High, AAC-LC
+            'video/mp4;codecs=h264,aac',               // Generic H.264/AAC
+            'video/mp4',                                // Plain MP4 (let browser decide codecs)
+            'video/x-matroska;codecs=avc1,opus',       // MKV with H.264 (rare but possible)
         ];
         
         for (const type of possibleTypes) {
@@ -355,7 +361,7 @@ export default function MeetingPage() {
             }
         }
         
-        console.warn('No supported MIME type found, using default');
+        console.warn('No H.264/MP4 MIME type supported. Recording will use browser default (likely WebM).');
         return '';
     };
 
