@@ -6,7 +6,8 @@ import src.videochat
 from src.login import login
 from src.signup import signup
 from src.subjects import subjects
-from flask_jwt_extended import create_access_token, JWTManager
+from flask_jwt_extended import create_access_token, JWTManager, get_jwt_identity, jwt_required
+from src.create_event import create_event
 
 
 # Create a Flask app instance
@@ -90,6 +91,28 @@ def get_subjects():
         return {'subjects': subjects()}, 200
     except Exception as e:
         return {'error': f'Error: {e}'}, 500
+
+
+@app.route('/create_event', methods=['POST'])
+@jwt_required()
+def post_create_event():
+    userid_tutee = get_jwt_identity()  # Get userid from JWT token
+    available_start = request.json.get('available_start')
+    available_end = request.json.get('available_end')
+    category = request.json.get('category')
+    title = request.json.get('title')
+    description = request.json.get('description')
+
+    eid = create_event(
+        userid_tutee,
+        available_start,
+        available_end,
+        category,
+        title,
+        description
+    )
+    return {'event_id': eid}, 200
+
 
 if __name__ == "__main__":
 
