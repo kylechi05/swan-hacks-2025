@@ -24,6 +24,8 @@ export default function MeetingPage() {
     const pc2Ref = useRef<RTCPeerConnection | null>(null);
     const screenStreamRef = useRef<MediaStream | null>(null);
     const isOfferCreatorRef = useRef<boolean>(false);
+    const makingOfferRef = useRef<boolean>(false);
+    const ignoreOfferRef = useRef<boolean>(false);
 
     const configuration: RTCConfiguration = {
         iceServers: [
@@ -133,6 +135,25 @@ export default function MeetingPage() {
         };
     }, [meetingId]);
 
+    // Centralized offer-answer exchange function
+    const runOfferAnswer = async (pc: RTCPeerConnection) => {
+        if (!socketRef.current) return;
+        
+        try {
+            console.log("[Renegotiation] Starting offer-answer exchange");
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            
+            socketRef.current.emit("offer", {
+                sdp: pc.localDescription!.sdp,
+                type: pc.localDescription!.type,
+            });
+            console.log("[Renegotiation] Offer sent");
+        } catch (error) {
+            console.error("[Renegotiation] Error during offer-answer:", error);
+        }
+    };
+
     // Effect to get user media when call starts
     useEffect(() => {
         if (!shouldStartCall || localStreamRef.current) return;
@@ -155,6 +176,11 @@ export default function MeetingPage() {
                 if (localVideoRef.current) {
                     localVideoRef.current.srcObject = stream;
                 }
+                console.log("[Local Stream] Acquired media stream:", {
+                    streamId: stream.id,
+                    audioTracks: stream.getAudioTracks().map(t => ({ id: t.id, label: t.label, enabled: t.enabled })),
+                    videoTracks: stream.getVideoTracks().map(t => ({ id: t.id, label: t.label, enabled: t.enabled }))
+                });
                 setIsCallActive(true);
                 isOfferCreatorRef.current = true;
             } catch (error) {
@@ -196,47 +222,54 @@ export default function MeetingPage() {
                 });
 
                 pc1Ref.current.addEventListener("track", (e) => {
-                    console.log("Track received:", e.track.kind);
+                    console.log("[PC1] Track received:", {
+                        kind: e.track.kind,
+                        id: e.track.id,
+                        label: e.track.label,
+                        enabled: e.track.enabled,
+                        muted: e.track.muted,
+                        readyState: e.track.readyState
+                    });
                     if (remoteVideoRef.current && e.streams[0]) {
-                        console.log("Setting remote video stream");
+                        console.log("[PC1] Setting remote video stream:", {
+                            streamId: e.streams[0].id,
+                            tracks: e.streams[0].getTracks().map(t => ({ kind: t.kind, id: t.id, label: t.label }))
+                        });
                         remoteVideoRef.current.srcObject = e.streams[0];
                     }
                 });
 
-                pc1Ref.current.addEventListener(
-                    "negotiationneeded",
-                    async () => {
-                        console.log("Negotiation needed, creating new offer");
-                        try {
-                            if (
-                                pc1Ref.current &&
-                                pc1Ref.current.signalingState !== "closed"
-                            ) {
-                                const offer =
-                                    await pc1Ref.current.createOffer();
-                                await pc1Ref.current.setLocalDescription(offer);
-                                if (socketRef.current) {
-                                    socketRef.current.emit("offer", {
-                                        sdp: pc1Ref.current.localDescription!
-                                            .sdp,
-                                        type: pc1Ref.current.localDescription!
-                                            .type,
-                                    });
-                                }
-                            }
-                        } catch (error) {
-                            console.error("Error during renegotiation:", error);
+                pc1Ref.current.addEventListener("negotiationneeded", async () => {
+                    console.log("[PC1] Negotiation needed event fired");
+                    try {
+                        if (!pc1Ref.current || pc1Ref.current.signalingState === "closed") {
+                            console.log("[PC1] Peer connection closed, skipping negotiation");
+                            return;
                         }
-                    },
-                );
+
+                        // Prevent collisions during negotiation
+                        if (makingOfferRef.current) {
+                            console.log("[PC1] Already making an offer, skipping");
+                            return;
+                        }
+
+                        makingOfferRef.current = true;
+                        console.log("[PC1] Starting negotiation sequence");
+                        await runOfferAnswer(pc1Ref.current);
+                        makingOfferRef.current = false;
+                        console.log("[PC1] Negotiation sequence complete");
+                    } catch (error) {
+                        console.error("[PC1] Error during renegotiation:", error);
+                        makingOfferRef.current = false;
+                    }
+                });
 
                 // Add local stream to peer connection
                 if (localStreamRef.current) {
+                    console.log("[PC1] Adding tracks to peer connection:");
                     localStreamRef.current.getTracks().forEach((track) => {
-                        pc1Ref.current!.addTrack(
-                            track,
-                            localStreamRef.current!,
-                        );
+                        console.log(`[PC1] Adding ${track.kind} track:`, { id: track.id, label: track.label, enabled: track.enabled });
+                        pc1Ref.current!.addTrack(track, localStreamRef.current!);
                     });
                 }
 
@@ -247,12 +280,26 @@ export default function MeetingPage() {
                 });
                 await pc1Ref.current.setLocalDescription(offer);
 
+                // Log what this peer connection is sending
+                const senders = pc1Ref.current.getSenders();
+                console.log("[PC1] Currently sending tracks:", senders.map(sender => ({
+                    track: sender.track ? {
+                        kind: sender.track.kind,
+                        id: sender.track.id,
+                        label: sender.track.label,
+                        enabled: sender.track.enabled,
+                        muted: sender.track.muted,
+                        readyState: sender.track.readyState
+                    } : null
+                })));
+
                 if (socketRef.current) {
                     socketRef.current.emit("offer", {
                         sdp: pc1Ref.current.localDescription!.sdp,
                         type: pc1Ref.current.localDescription!.type,
                     });
                 }
+                console.log("[PC1] Initial offer sent");
             } catch (error) {
                 console.error("Error creating peer connection:", error);
                 setError("Failed to establish connection");
@@ -260,10 +307,12 @@ export default function MeetingPage() {
         };
 
         createPeerConnection();
-    }, [isCallActive, configuration]);
+    }, [isCallActive]);
 
     const handleOffer = async (data: { sdp: string; type: RTCSdpType }) => {
         try {
+            console.log("[HandleOffer] Processing incoming offer");
+            
             // Get local stream if we don't have it
             if (!localStreamRef.current) {
                 const stream = await navigator.mediaDevices.getUserMedia({
@@ -273,12 +322,18 @@ export default function MeetingPage() {
                 if (localVideoRef.current) {
                     localVideoRef.current.srcObject = stream;
                 }
+                console.log("[HandleOffer] Acquired media stream:", {
+                    streamId: stream.id,
+                    audioTracks: stream.getAudioTracks().map(t => ({ id: t.id, label: t.label, enabled: t.enabled })),
+                    videoTracks: stream.getVideoTracks().map(t => ({ id: t.id, label: t.label, enabled: t.enabled }))
+                });
                 localStreamRef.current = stream;
                 setIsCallActive(true);
             }
 
-            // Create peer connection
+            // Create peer connection if it doesn't exist
             if (!pc2Ref.current) {
+                console.log("[HandleOffer] Creating PC2 (answerer)");
                 pc2Ref.current = new RTCPeerConnection(configuration);
 
                 pc2Ref.current.addEventListener("icecandidate", (e) => {
@@ -292,23 +347,35 @@ export default function MeetingPage() {
                 });
 
                 pc2Ref.current.addEventListener("track", (e) => {
-                    console.log("Track received:", e.track.kind);
+                    console.log("[PC2] Track received:", {
+                        kind: e.track.kind,
+                        id: e.track.id,
+                        label: e.track.label,
+                        enabled: e.track.enabled,
+                        muted: e.track.muted,
+                        readyState: e.track.readyState
+                    });
                     if (remoteVideoRef.current && e.streams[0]) {
-                        console.log("Setting remote video stream");
+                        console.log("[PC2] Setting remote video stream:", {
+                            streamId: e.streams[0].id,
+                            tracks: e.streams[0].getTracks().map(t => ({ kind: t.kind, id: t.id, label: t.label }))
+                        });
+                        // For renegotiation (like screen share), we need to update the srcObject
                         remoteVideoRef.current.srcObject = e.streams[0];
                     }
                 });
 
-                pc2Ref.current.addEventListener(
-                    "negotiationneeded",
-                    async () => {
-                        console.log("Negotiation needed on pc2");
-                    },
-                );
+                pc2Ref.current.addEventListener("negotiationneeded", async () => {
+                    console.log("[PC2] Negotiation needed event fired");
+                    // PC2 is the answerer, so it should not initiate offers
+                    // This event can fire but we let PC1 drive renegotiation
+                });
 
                 // Add local stream
                 if (localStreamRef.current) {
+                    console.log("[PC2] Adding tracks to peer connection:");
                     localStreamRef.current.getTracks().forEach((track) => {
+                        console.log(`[PC2] Adding ${track.kind} track:`, { id: track.id, label: track.label, enabled: track.enabled });
                         pc2Ref.current!.addTrack(
                             track,
                             localStreamRef.current!,
@@ -317,18 +384,45 @@ export default function MeetingPage() {
                 }
             }
 
+            // Handle the offer - this works for both initial connection and renegotiation
+            const offerCollision = pc2Ref.current.signalingState !== "stable";
+            
+            if (offerCollision) {
+                console.log("[HandleOffer] Collision detected - we're polite, so we'll rollback");
+                // Rollback to stable state before accepting new offer
+                await pc2Ref.current.setLocalDescription({type: "rollback"} as RTCSessionDescriptionInit);
+            }
+
+            console.log("[HandleOffer] Setting remote description");
             await pc2Ref.current.setRemoteDescription(
                 new RTCSessionDescription(data),
             );
+            
+            console.log("[HandleOffer] Creating answer");
             const answer = await pc2Ref.current.createAnswer();
             await pc2Ref.current.setLocalDescription(answer);
 
+            // Log what this peer connection is sending
+            const senders = pc2Ref.current.getSenders();
+            console.log("[PC2] Currently sending tracks:", senders.map(sender => ({
+                track: sender.track ? {
+                    kind: sender.track.kind,
+                    id: sender.track.id,
+                    label: sender.track.label,
+                    enabled: sender.track.enabled,
+                    muted: sender.track.muted,
+                    readyState: sender.track.readyState
+                } : null
+            })));
+
+            console.log("[HandleOffer] Sending answer");
             if (socketRef.current) {
                 socketRef.current.emit("answer", {
                     sdp: pc2Ref.current.localDescription!.sdp,
                     type: pc2Ref.current.localDescription!.type,
                 });
             }
+            console.log("[HandleOffer] Answer sent successfully");
         } catch (error) {
             console.error("Error handling offer:", error);
             setError("Failed to handle connection offer");
@@ -337,10 +431,14 @@ export default function MeetingPage() {
 
     const handleAnswer = async (data: { sdp: string; type: RTCSdpType }) => {
         try {
+            console.log("[HandleAnswer] Processing answer");
             if (pc1Ref.current && pc1Ref.current.signalingState !== "stable") {
                 await pc1Ref.current.setRemoteDescription(
                     new RTCSessionDescription(data),
                 );
+                console.log("[HandleAnswer] Remote description set successfully");
+            } else {
+                console.log("[HandleAnswer] Skipping - already in stable state or no PC");
             }
         } catch (error) {
             console.error("Error handling answer:", error);
@@ -387,7 +485,14 @@ export default function MeetingPage() {
 
                 screenStreamRef.current = screenStream;
                 const screenTrack = screenStream.getVideoTracks()[0];
-                console.log("Got screen track:", screenTrack.id);
+                console.log("[Screen Share] Got screen track:", {
+                    id: screenTrack.id,
+                    label: screenTrack.label,
+                    enabled: screenTrack.enabled,
+                    muted: screenTrack.muted,
+                    readyState: screenTrack.readyState,
+                    settings: screenTrack.getSettings()
+                });
 
                 // Find active peer connection and replace video track
                 const pc = pc1Ref.current || pc2Ref.current;
@@ -396,13 +501,33 @@ export default function MeetingPage() {
                     const videoSender = senders.find(
                         (sender) => sender.track?.kind === "video",
                     );
-
                     if (videoSender && localStreamRef.current) {
-                        console.log("Replacing video track with screen share");
+                        console.log("[Screen Share] Current video sender:", {
+                            track: videoSender.track ? {
+                                kind: videoSender.track.kind,
+                                id: videoSender.track.id,
+                                label: videoSender.track.label,
+                                enabled: videoSender.track.enabled
+                            } : null
+                        });
+                        console.log("[Screen Share] Replacing video track with screen share");
 
                         // Replace the track
-                        console.log(videoSender);
                         await videoSender.replaceTrack(screenTrack);
+                        console.log("[Screen Share] Track replaced. New track:", {
+                            kind: screenTrack.kind,
+                            id: screenTrack.id,
+                            label: screenTrack.label
+                        });
+
+                        // For PC1, manually trigger renegotiation since replaceTrack doesn't always fire negotiationneeded
+                        if (pc1Ref.current) {
+                            console.log("[Screen Share] PC1 detected - manually triggering renegotiation");
+                            await runOfferAnswer(pc1Ref.current);
+                        } else {
+                            console.log("[Screen Share] PC2 detected - negotiationneeded should handle on remote peer");
+                        }
+                        
                         setIsScreenSharing(true);
 
                         // Show screen share in local video
@@ -415,14 +540,26 @@ export default function MeetingPage() {
                         // Handle screen share stop
                         screenTrack.onended = async () => {
                             if (!mounted) return;
-
-                            console.log(
-                                "Screen share ended, switching back to camera",
-                            );
-                            const cameraTrack =
-                                localStreamRef.current?.getVideoTracks()[0];
+                            
+                            console.log("[Screen Share] Screen share ended, switching back to camera");
+                            const cameraTrack = localStreamRef.current
+                                ?.getVideoTracks()[0];
                             if (cameraTrack && videoSender) {
+                                console.log("[Screen Share] Replacing with camera track:", {
+                                    id: cameraTrack.id,
+                                    label: cameraTrack.label,
+                                    enabled: cameraTrack.enabled
+                                });
                                 await videoSender.replaceTrack(cameraTrack);
+
+                                // For PC1, manually trigger renegotiation when switching back
+                                if (pc1Ref.current) {
+                                    console.log("[Screen Share] PC1 detected - manually triggering renegotiation to switch back to camera");
+                                    await runOfferAnswer(pc1Ref.current);
+                                } else {
+                                    console.log("[Screen Share] PC2 detected - negotiationneeded should handle on remote peer");
+                                }
+
                                 if (
                                     localVideoRef.current &&
                                     localStreamRef.current
@@ -479,6 +616,35 @@ export default function MeetingPage() {
     const handleShareScreen = () => {
         setShouldShareScreen(true);
     };
+
+    const logCurrentSenders = () => {
+        const pc = pc1Ref.current || pc2Ref.current;
+        if (pc) {
+            const senders = pc.getSenders();
+            const pcName = pc1Ref.current ? 'PC1' : 'PC2';
+            console.log(`[${pcName}] Active senders:`, senders.map(sender => ({
+                track: sender.track ? {
+                    kind: sender.track.kind,
+                    id: sender.track.id,
+                    label: sender.track.label,
+                    enabled: sender.track.enabled,
+                    muted: sender.track.muted,
+                    readyState: sender.track.readyState
+                } : null
+            })));
+        } else {
+            console.log("[Debug] No active peer connection");
+        }
+    };
+
+    // Expose logging function for debugging
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            (window as any).logCurrentSenders = logCurrentSenders;
+            (window as any).pc1 = pc1Ref;
+            (window as any).pc2 = pc2Ref;
+        }
+    }, []);
 
     const handleHangup = () => {
         // Close peer connections
