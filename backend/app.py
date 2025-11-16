@@ -288,13 +288,17 @@ def handle_recorder_offer(data):
             emit('error', {'message': 'Not in a meeting room'})
             return
         
-        logger.info(f"Received recorder offer from {sid} in room {room_id}")
+        logger.info(f"[RECORDER] Received recorder offer from {sid} in room {room_id}")
+        logger.info(f"[RECORDER] Current recording sessions in room {room_id}: {list(meeting_recorder.sessions.get(room_id, {}).keys())}")
         
         async def process_offer():
             # Create or get recording session
             session = meeting_recorder.get_session(room_id, sid)
             if not session:
+                logger.info(f"[RECORDER] Creating new recording session for {sid} in room {room_id}")
                 session = await meeting_recorder.start_recording(room_id, sid)
+            else:
+                logger.info(f"[RECORDER] Using existing recording session for {sid}")
             
             # Handle the offer and get answer
             answer = await session.handle_offer(data)
@@ -303,7 +307,8 @@ def handle_recorder_offer(data):
         # Process offer and send answer
         answer = run_async(process_offer())
         emit('recorder-answer', answer)
-        logger.info(f"Sent recorder answer to {sid}")
+        logger.info(f"[RECORDER] Sent recorder answer to {sid}")
+        logger.info(f"[RECORDER] Total recording sessions in room {room_id}: {list(meeting_recorder.sessions.get(room_id, {}).keys())}")
         
     except Exception as e:
         logger.error(f"Error in handle_recorder_offer: {e}", exc_info=True)
@@ -731,6 +736,36 @@ def api_recordings_list():
         return jsonify(meetings_list), 200
     except Exception as e:
         logger.error(f"Error listing recordings: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/recordings/status')
+def api_recordings_status():
+    """API endpoint to check active recording sessions"""
+    try:
+        status = {
+            'active_meetings': len(meeting_recorder.sessions),
+            'meetings': {}
+        }
+        
+        for meeting_id, participants in meeting_recorder.sessions.items():
+            status['meetings'][meeting_id] = {
+                'participant_count': len(participants),
+                'participants': list(participants.keys()),
+                'recording_status': {
+                    pid: {
+                        'is_recording': session.is_recording,
+                        'has_video': bool(session.video_track),
+                        'has_audio': bool(session.audio_track),
+                        'output_file': session.output_file
+                    }
+                    for pid, session in participants.items()
+                }
+            }
+        
+        return jsonify(status), 200
+    except Exception as e:
+        logger.error(f"Error getting recording status: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 

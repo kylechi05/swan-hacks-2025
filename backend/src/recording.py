@@ -60,12 +60,19 @@ class MediaRecorderSession:
                 self.audio_track = track
                 logger.info(f"[Recording] Set audio track for {self.participant_id}")
             
+            # Log current state
+            logger.info(f"[Recording] Current state for {self.participant_id}: video={bool(self.video_track)}, audio={bool(self.audio_track)}, is_recording={self.is_recording}")
+            
             # Start recording immediately when we have both tracks
             # Since we only start recording when both participants are present,
             # both audio and video tracks should arrive together
             if not self.is_recording and self.video_track and self.audio_track:
-                logger.info(f"[Recording] Both tracks received, starting recording")
+                logger.info(f"[Recording] Both tracks received, starting recording for {self.participant_id}")
                 await self._start_recording()
+            elif not self.is_recording:
+                logger.info(f"[Recording] Waiting for more tracks for {self.participant_id}. video={bool(self.video_track)}, audio={bool(self.audio_track)}")
+                # Schedule a delayed start in case tracks arrive slowly
+                asyncio.create_task(self._delayed_start_check())
             
             @track.on("ended")
             async def on_ended():
@@ -87,6 +94,15 @@ class MediaRecorderSession:
             logger.info(f"ICE gathering state for {self.participant_id}: {self.pc.iceGatheringState}")
         
         logger.info(f"Recording session initialized for participant {self.participant_id}")
+    
+    async def _delayed_start_check(self):
+        """Check if we can start recording after a delay, in case tracks arrive slowly."""
+        await asyncio.sleep(2.0)  # Wait 2 seconds
+        if not self.is_recording and self.video_track and self.audio_track:
+            logger.info(f"[Recording] Delayed check: Both tracks now available for {self.participant_id}, starting recording")
+            await self._start_recording()
+        elif not self.is_recording:
+            logger.warning(f"[Recording] Delayed check: Still missing tracks for {self.participant_id}. video={bool(self.video_track)}, audio={bool(self.audio_track)}")
     
     async def _start_recording(self):
         """Start the media recorder with available tracks."""
