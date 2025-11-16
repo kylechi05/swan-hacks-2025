@@ -1,4 +1,4 @@
-import ReactPlayer from 'react-player';
+import { useEffect, useRef } from 'react';
 
 interface VideoPlayerProps {
     stream: MediaStream;
@@ -7,7 +7,15 @@ interface VideoPlayerProps {
 }
 
 const VideoPlayer = ({ stream, isAudioMute, name }: VideoPlayerProps) => {
+    const videoRef = useRef<HTMLVideoElement>(null);
     const myStream = name === "My Stream";
+
+    useEffect(() => {
+        if (videoRef.current && stream) {
+            videoRef.current.srcObject = stream;
+        }
+    }, [stream]);
+
     return (
         <div>
             <div className={`${name === "My Stream" ? "flex flex-col items-center justify-center absolute top-2 right-3 z-10" : "px-2"}`}>
@@ -18,12 +26,12 @@ const VideoPlayer = ({ stream, isAudioMute, name }: VideoPlayerProps) => {
                  ${myStream ? " mxs:w-[80px] mxs:h-[120px] msm:w-[100px] msm:rounded-md msm:h-[140px] mmd:w-[140px] md:w-[200px] lg:w-[280px]"
                         : "mxs:h-[450px] mss:h-[500px] mmd:h-[600px] md:w-[800px] md:h-[500px]"}`}
                 >
-                    <ReactPlayer
-                        url={stream}
-                        playing
+                    <video
+                        ref={videoRef}
+                        autoPlay
+                        playsInline
                         muted={isAudioMute}
-                        height="100%"
-                        width="100%"
+                        className="h-full w-full object-cover"
                         style={{ transform: 'scaleX(-1)' }}
                     />
                 </div>
