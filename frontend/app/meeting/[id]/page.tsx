@@ -144,7 +144,7 @@ export default function MeetingPage() {
                 setIsCallActive(true);
             }
 
-            // Create peer connection
+            // Create peer connection if needed
             if (!pc2Ref.current) {
                 pc2Ref.current = new RTCPeerConnection(configuration);
 
@@ -167,21 +167,9 @@ export default function MeetingPage() {
                 });
 
                 pc2Ref.current.addEventListener("negotiationneeded", async () => {
-                    console.log("Negotiation needed on pc2, creating offer");
-                    try {
-                        if (pc2Ref.current && pc2Ref.current.signalingState === "stable") {
-                            const offer = await pc2Ref.current.createOffer();
-                            await pc2Ref.current.setLocalDescription(offer);
-                            if (socketRef.current) {
-                                socketRef.current.emit("offer", {
-                                    sdp: pc2Ref.current.localDescription!.sdp,
-                                    type: pc2Ref.current.localDescription!.type,
-                                });
-                            }
-                        }
-                    } catch (error) {
-                        console.error("Error during renegotiation on pc2:", error);
-                    }
+                    console.log("Negotiation needed on pc2 (answerer side) - waiting for offer");
+                    // Don't create offers when we're the answerer
+                    // The remote peer will send us a new offer which we'll handle in handleOffer
                 });
 
                 // Add local stream
@@ -195,28 +183,48 @@ export default function MeetingPage() {
                 }
             }
 
-            // Check state before setting remote description
-            if (
-                pc2Ref.current.signalingState === "stable" ||
-                pc2Ref.current.signalingState === "have-remote-offer"
-            ) {
-                await pc2Ref.current.setRemoteDescription(
-                    new RTCSessionDescription(data),
-                );
-                const answer = await pc2Ref.current.createAnswer();
-                await pc2Ref.current.setLocalDescription(answer);
+            // Handle the offer - works for both initial connection and renegotiation
+            if (pc2Ref.current) {
+                // Check if we can set remote description
+                const validStates = ["stable", "have-remote-offer"];
+                if (validStates.includes(pc2Ref.current.signalingState)) {
+                    console.log(`Setting remote offer in state: ${pc2Ref.current.signalingState}`);
+                    await pc2Ref.current.setRemoteDescription(
+                        new RTCSessionDescription(data),
+                    );
+                    const answer = await pc2Ref.current.createAnswer();
+                    await pc2Ref.current.setLocalDescription(answer);
 
-                if (socketRef.current) {
-                    socketRef.current.emit("answer", {
-                        sdp: pc2Ref.current.localDescription!.sdp,
-                        type: pc2Ref.current.localDescription!.type,
-                    });
+                    if (socketRef.current) {
+                        socketRef.current.emit("answer", {
+                            sdp: pc2Ref.current.localDescription!.sdp,
+                            type: pc2Ref.current.localDescription!.type,
+                        });
+                    }
+                    console.log("Successfully handled offer and sent answer");
+                } else {
+                    console.warn(
+                        `Cannot set remote offer in state ${pc2Ref.current.signalingState}, will retry`,
+                    );
+                    // If we're in have-local-offer state, we need to do rollback
+                    if (pc2Ref.current.signalingState === "have-local-offer") {
+                        await pc2Ref.current.setLocalDescription({ type: "rollback" } as RTCSessionDescriptionInit);
+                        // Now retry setting the remote offer
+                        await pc2Ref.current.setRemoteDescription(
+                            new RTCSessionDescription(data),
+                        );
+                        const answer = await pc2Ref.current.createAnswer();
+                        await pc2Ref.current.setLocalDescription(answer);
+
+                        if (socketRef.current) {
+                            socketRef.current.emit("answer", {
+                                sdp: pc2Ref.current.localDescription!.sdp,
+                                type: pc2Ref.current.localDescription!.type,
+                            });
+                        }
+                        console.log("Successfully handled offer after rollback");
+                    }
                 }
-                console.log("Successfully handled offer and sent answer");
-            } else {
-                console.warn(
-                    `Cannot set remote offer in state ${pc2Ref.current.signalingState}`,
-                );
             }
         } catch (error) {
             console.error("Error handling offer:", error);
