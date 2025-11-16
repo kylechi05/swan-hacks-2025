@@ -54,15 +54,6 @@ def handle_disconnect():
     emit("message", f"{username} left the chat", broadcast=True)
 
 
-@app.route('/offer', methods=['POST'])
-def offer():
-    return src.videochat.offer()
-
-@app.route('/video_feed')
-def video_feed():
-    return Response(src.videochat.gen(camera),
-                    mimetype='multipart/x-mixed-replace; boundary=frame')
-
 @app.route('/signup', methods=['POST'])
 def post_signup():
     name = request.json.get('name')
