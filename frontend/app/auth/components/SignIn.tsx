@@ -44,7 +44,7 @@ export function SignIn() {
 
                 <button
                     type="submit"
-                    className="transition-all cursor-pointer rounded-lg hover:bg-blue-600 bg-blue-500 px-4 py-2 text-white hover:scale-105"
+                    className="transition-all cursor-pointer rounded-lg hover:bg-blue-600 bg-blue-900 px-4 py-2 text-white hover:scale-105"
                 >
                     Sign In
                 </button>

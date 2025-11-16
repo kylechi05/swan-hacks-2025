@@ -56,7 +56,7 @@ export default function Home() {
             </div>
           </div>
         <div className="space-y-10"></div>
-        <div className="max-w-xs mx-auto space-y-6 text-center p-6 border-b [border-width:1px] [border-color:var(--primary-border-color)] bg-blue-950 rounded-xl">
+        <div className="max-w-xs mx-auto cursor-pointer rounded-lg bg-green-600 px-4 py-2 text-center text-white transition-all hover:scale-105 hover:bg-green-500">
           <Link href="/events" className="text-2xl font-bold hover:text-white ml-auto">Get Started</Link>
         </div>
       </section>
