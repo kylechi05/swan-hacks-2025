@@ -103,13 +103,11 @@ export default function MeetingPage() {
 
         socket.on(
             "ice-candidate",
-            async (
-                data: {
-                    candidate: string;
-                    sdpMLineIndex: number;
-                    sdpMid: string;
-                },
-            ) => {
+            async (data: {
+                candidate: string;
+                sdpMLineIndex: number;
+                sdpMid: string;
+            }) => {
                 console.log("Received ICE candidate");
                 await handleIceCandidate(data);
             },
@@ -271,9 +269,11 @@ export default function MeetingPage() {
         }
     };
 
-    const handleIceCandidate = async (
-        data: { candidate: string; sdpMLineIndex: number; sdpMid: string },
-    ) => {
+    const handleIceCandidate = async (data: {
+        candidate: string;
+        sdpMLineIndex: number;
+        sdpMid: string;
+    }) => {
         try {
             const candidate = new RTCIceCandidate(data);
             if (pcRef.current && pcRef.current.remoteDescription) {
@@ -372,9 +372,7 @@ export default function MeetingPage() {
             localStreamRef.current = null;
         }
         if (screenStreamRef.current) {
-            screenStreamRef.current
-                .getTracks()
-                .forEach((track) => track.stop());
+            screenStreamRef.current.getTracks().forEach((t) => t.stop());
             screenStreamRef.current = null;
         }
         if (localVideoRef.current) localVideoRef.current.srcObject = null;
@@ -398,7 +396,7 @@ export default function MeetingPage() {
                     autoPlay
                     playsInline
                     muted
-                    className="absolute bottom-6 right-6 h-40 w-52 rounded-lg border-2 border-white object-cover shadow-lg"
+                    className="absolute right-6 bottom-6 h-40 w-52 rounded-lg border-2 border-white object-cover shadow-lg"
                 />
 
                 {!isCallActive && (
