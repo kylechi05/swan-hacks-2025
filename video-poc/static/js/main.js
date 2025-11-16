@@ -113,9 +113,12 @@ socket.on('peer-ready', function() {
 });
 
 const startButton = document.getElementById('startButton');
+const shareScreenButton = document.getElementById('shareScreenButton');
 const hangupButton = document.getElementById('hangupButton');
 hangupButton.disabled = true;
+shareScreenButton.disabled = true;
 startButton.addEventListener('click', start);
+shareScreenButton.addEventListener('click', shareScreen);
 hangupButton.addEventListener('click', hangup);
 
 let startTime;
@@ -192,6 +195,7 @@ async function start() {
     
     // Step 2: Create peer connection and start call
     hangupButton.disabled = false;
+    shareScreenButton.disabled = false;
     console.log('Starting call');
     startTime = window.performance.now();
     
@@ -226,6 +230,56 @@ async function start() {
   } catch (e) {
     alert(`getUserMedia() error: ${e.name}`);
     startButton.disabled = false;
+  }
+}
+
+async function shareScreen() {
+  console.log('Starting screen share');
+  shareScreenButton.disabled = true;
+  
+  try {
+    // Get screen share stream
+    const screenStream = await navigator.mediaDevices.getDisplayMedia({
+      video: {
+        cursor: 'always'
+      },
+      audio: false
+    });
+    
+    console.log('Got screen share stream');
+    
+    // Replace video track in the active peer connection
+    const screenTrack = screenStream.getVideoTracks()[0];
+    
+    // Find which peer connection is active and replace its video track
+    const senders = pc1 ? pc1.getSenders() : (pc2 ? pc2.getSenders() : []);
+    const videoSender = senders.find(sender => sender.track && sender.track.kind === 'video');
+    
+    if (videoSender) {
+      await videoSender.replaceTrack(screenTrack);
+      console.log('Replaced video track with screen share');
+      
+      // Show screen share in local video
+      localVideo.srcObject = screenStream;
+      
+      // When screen share stops, switch back to camera
+      screenTrack.onended = async () => {
+        console.log('Screen share ended, switching back to camera');
+        const cameraTrack = localStream.getVideoTracks()[0];
+        if (cameraTrack && videoSender) {
+          await videoSender.replaceTrack(cameraTrack);
+          localVideo.srcObject = localStream;
+        }
+        shareScreenButton.disabled = false;
+      };
+    } else {
+      console.error('No video sender found');
+      shareScreenButton.disabled = false;
+    }
+  } catch (e) {
+    console.error('Error sharing screen:', e);
+    alert(`Screen share error: ${e.message}`);
+    shareScreenButton.disabled = false;
   }
 }
 
@@ -315,5 +369,6 @@ function hangup() {
   localVideo.srcObject = null;
   remoteVideo.srcObject = null;
   hangupButton.disabled = true;
+  shareScreenButton.disabled = true;
   startButton.disabled = false;
 }
