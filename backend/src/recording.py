@@ -118,7 +118,7 @@ class MediaRecorderSession:
             return
             
         try:            
-            self.recorder = MediaRecorder(self.output_file.replace('.mp4', '.webm'), format='webm')            
+            self.recorder = MediaRecorder(self.output_file, format='mp4')            
             if self.video_track:
                 self.recorder.addTrack(self.video_track)
                 logger.info(f"[Recording] Added video track to recorder for {self.participant_id}")
