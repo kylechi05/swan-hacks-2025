@@ -359,12 +359,14 @@ def handle_join_chat(data):
                 logger.warning(f"Event {eventid} not found")
                 return
             
+            tutor_id = json.loads(event.userid_tutor)['userid_tutor']
+            
             # Check if user is the tutor or tutee
-            is_authorized = (event.userid_tutee == userid or str(event.userid_tutor) == str(userid))
+            is_authorized = (event.userid_tutee == userid or str(tutor_id) == str(userid))
             
             if not is_authorized:
-                emit('chat-error', {'message': f'User {userid} not authorized for event {eventid}. Correct user - {event.userid_tutor}'})
-                print(f"User {userid} not authorized for event {eventid}. Correct user - {event.userid_tutor}")
+                emit('chat-error', {'message': f'User {userid} not authorized for event {eventid}. Correct user - {tutor_id}'})
+                print(f"User {userid} not authorized for event {eventid}. Correct user - {tutor_id}")
                 return
             
             # Initialize chat room if it doesn't exist
@@ -388,7 +390,7 @@ def handle_join_chat(data):
             chat_rooms[eventid]['users'][sid] = userid
             
             # Set tutor or tutee sid
-            if str(event.userid_tutor) == str(userid):
+            if str(tutor_id) == str(userid):
                 chat_rooms[eventid]['tutor_sid'] = sid
             elif event.userid_tutee == userid:
                 chat_rooms[eventid]['tutee_sid'] = sid
