@@ -1,0 +1,78 @@
+from src.models import RequestedEvent
+from src.database import get_db
+import json
+
+def list_events():
+    """
+    List all requested events in the database.
+    
+    Returns:
+        A list of all requested events with their details.
+    """
+    with get_db() as db:
+        events = db.query(RequestedEvent).all()
+        event_list = []
+        
+        for event in events:
+            event_data = {
+                'eventid': event.eventid,
+                'userid_requester': event.userid_requester,
+                'title': event.title,
+                'subject': event.subject,
+                'description': event.description,
+                'possible_tutors': json.loads(event.possible_tutors) if event.possible_tutors else [],
+                'accepted_tutor': json.loads(event.accepted_tutor) if event.accepted_tutor else None,
+                'is_accepted': event.is_accepted
+            }
+            event_list.append(event_data)
+        
+        return event_list
+
+def list_tutee_events(userid_tutee):
+    """
+    Lists the events requested by a specific tutee.
+    """
+    with get_db() as db:
+        events = db.query(RequestedEvent).filter(RequestedEvent.userid_tutee == userid_tutee).all()
+        event_list = []
+        
+        for event in events:
+            event_data = {
+                'eventid': event.eventid,
+                'userid_tutee': event.userid_tutee,
+                'title': event.title,
+                'subject': event.subject,
+                'description': event.description,
+                'possible_tutors': json.loads(event.possible_tutors) if event.possible_tutors else [],
+                'accepted_tutor': json.loads(event.accepted_tutor) if event.accepted_tutor else None,
+                'is_accepted': event.is_accepted
+            }
+            event_list.append(event_data)
+        
+        return event_list
+
+def list_tutor_events(userid_tutor):
+    """
+    Lists the events where a specific tutor has made offers.
+    """
+    with get_db() as db:
+        events = db.query(RequestedEvent).all()
+        tutor_event_list = []
+        
+        for event in events:
+            if event.possible_tutors:
+                possible_tutors_list = json.loads(event.possible_tutors)
+                if any(t['userid_tutor'] == userid_tutor for t in possible_tutors_list):
+                    event_data = {
+                        'eventid': event.eventid,
+                        'userid_tutee': event.userid_tutee,
+                        'title': event.title,
+                        'subject': event.subject,
+                        'description': event.description,
+                        'possible_tutors': possible_tutors_list,
+                        'accepted_tutor': event.accepted_tutor,
+                        'is_accepted': event.is_accepted
+                    }
+                    tutor_event_list.append(event_data)
+        
+        return tutor_event_list

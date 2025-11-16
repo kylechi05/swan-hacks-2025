@@ -42,18 +42,11 @@ def add_possible_tutor(eventid, userid_tutor, start, end):
         # Update event
         event.possible_tutors = json.dumps(possible_tutors_list)
         db.flush()
+
+        
         
         return possible_tutors_list
 
 
-if __name__ == "__main__":
-    # Test the function
-    result = add_possible_tutor(
-        eventid=1,
-        userid_tutor=2,
-        start="2025-11-20 10:00:00",
-        end="2025-11-20 12:00:00"
-    )
-    print(f"Possible tutors: {result}")
 
         

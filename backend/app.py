@@ -8,6 +8,11 @@ from src.subjects import subjects
 from flask_jwt_extended import create_access_token, JWTManager, get_jwt_identity, jwt_required
 from src.create_event import create_event
 from src.database import init_db, close_db_session
+from src.add_possible_tutor import add_possible_tutor
+from src.accept_tutor import accept_tutor
+from src.add_meeting import add_meeting
+from src.list_offers import list_offers
+from src.list_events import list_events, list_tutee_events, list_tutor_events
 
 
 # Create a Flask app instance
@@ -121,16 +126,89 @@ def post_create_event():
         import traceback
         traceback.print_exc()
         return {'error': str(e)}, 500
-
+ 
+# Add a possible tutor to an event
 @app.route('/event/<int:event_id>/offer', methods=['POST'])
 @jwt_required()
-def get_event_offer():
-    def generate():
-        request.json.get('eid')
-    return Response(generate(), mimetype='text/plain')
+def get_event_offer(event_id):
+    try:
+        add_possible_tutor(
+            eventid=event_id,  # Use event_id from URL
+            userid_tutor=int(get_jwt_identity()),
+            start=request.json.get('start'),
+            end=request.json.get('end')
+        )
+        return {'status': 200}, 200
+    except Exception as e:
+        print(f"Error in get_event_offer: {e}")
+        import traceback
+        traceback.print_exc()
+        return {'error': str(e)}, 500
 
-# @app.route('/get_events', methods=['POST'])
 
+# Accept a tutor for an event
+@app.route('/event/<int:event_id>/accept', methods=['POST'])
+@jwt_required()
+def accept_event_offer(event_id):
+    accepted_tutor = accept_tutor(
+        eventid=event_id,
+        userid_tutor=request.json.get('userid_tutor')
+    )
+    if accepted_tutor:
+        start = accepted_tutor.get('start')
+        end = accepted_tutor.get('end')
+        add_meeting(event_id, start, end)
+        return {'accepted_tutor': accepted_tutor}, 200
+    return {'error': 'Could not accept tutor'}, 500
+
+
+# List offers for an event
+@app.route('/event/<int:event_id>/offers', methods=['GET'])
+@jwt_required()
+def list_event_offers(event_id):
+    try:
+        offers = list_offers(event_id)
+        return {'offers': offers}, 200
+    except Exception as e:
+        return {'error': str(e)}, 500
+
+# Get all events
+@app.route('/events', methods=['GET'])
+@jwt_required()
+def get_all_events():
+    try:
+        events = list_events()
+        return {'events': events}, 200
+    except Exception as e:
+        return {'error': str(e)}, 500
+
+# Get events for a specific tutee
+@app.route('/events/tutee', methods=['GET'])
+@jwt_required()
+def get_tutee_events():
+    try:
+        userid_tutee = int(get_jwt_identity())
+        events = list_tutee_events(userid_tutee)
+        return {'events': events}, 200
+    except Exception as e:
+        print(f"Error in get_tutee_events: {e}")
+        import traceback
+        traceback.print_exc()
+        return {'error': str(e)}, 500
+
+# Get events where user is a tutor
+@app.route('/events/tutor', methods=['GET'])
+@jwt_required()
+def get_tutor_events():
+    try:
+        userid_tutor = int(get_jwt_identity())
+        events = list_tutor_events(userid_tutor)
+        return {'events': events}, 200
+    except Exception as e:
+        print(f"Error in get_tutor_events: {e}")
+        import traceback
+        traceback.print_exc()
+        return {'error': str(e)}, 500
 
 if __name__ == "__main__":
     socketio.run(app, debug=True, host='0.0.0.0', port=6969)
