@@ -65,7 +65,7 @@ export default function RecordingsListPage() {
                     <div className="flex min-h-[400px] items-center justify-center">
                         <div className="text-center">
                             <div className="mb-4 text-4xl">⏳</div>
-                            <p className="text-xl text-gray-300">
+                            <p className="text-xl text-(--light-gray)">
                                 Loading recordings...
                             </p>
                         </div>
@@ -77,14 +77,14 @@ export default function RecordingsListPage() {
                             <h2 className="mb-2 text-2xl font-bold text-red-400">
                                 Error Loading Recordings
                             </h2>
-                            <p className="text-gray-400">{error}</p>
+                            <p className="text-(--medium-gray)">{error}</p>
                         </div>
                     </div>
                 ) : meetings.length === 0 ? (
                     <div className="flex min-h-[400px] items-center justify-center">
                         <div className="text-center">
                             <div className="mb-4 text-6xl">📹</div>
-                            <h2 className="mb-2 text-2xl font-bold text-purple-400">
+                            <h2 className="mb-2 text-2xl font-bold text-green-400">
                                 No Recordings Yet
                             </h2>
                             <p className="text-gray-400">
@@ -104,7 +104,7 @@ export default function RecordingsListPage() {
                                     <h3 className="text-xl font-bold text-green-500">
                                         Meeting #{meeting.meeting_id.substring(0, 8)}
                                     </h3>
-                                    <p className="text-sm text-gray-400">
+                                    <p className="text-sm text-(--light-gray)">
                                         {meeting.recordings.length} Participant(s)
                                     </p>
                                 </div>
@@ -112,7 +112,7 @@ export default function RecordingsListPage() {
                                 <div className="p-5">
                                     <div className="mb-4 space-y-2 text-sm">
                                         <div className="flex justify-between">
-                                            <span className="text-gray-400">
+                                            <span className="text-(--light-gray)">
                                                 Created:
                                             </span>
                                             <span className="font-semibold">
@@ -122,7 +122,7 @@ export default function RecordingsListPage() {
                                             </span>
                                         </div>
                                         <div className="flex justify-between">
-                                            <span className="text-gray-400">
+                                            <span className="text-(--light-gray)">
                                                 Duration:
                                             </span>
                                             <span className="font-semibold">
