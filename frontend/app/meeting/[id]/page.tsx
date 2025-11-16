@@ -255,9 +255,21 @@ export default function MeetingPage() {
                         `Cannot set remote answer in state ${pc1Ref.current.signalingState}`,
                     );
                 }
+                // Check if we're in a valid state to receive an answer
+                if (pc1Ref.current.signalingState === "have-local-offer") {
+                    await pc1Ref.current.setRemoteDescription(
+                        new RTCSessionDescription(data),
+                    );
+                    console.log("Successfully set remote answer");
+                } else {
+                    console.warn(
+                        `Cannot set remote answer in state ${pc1Ref.current.signalingState}`,
+                    );
+                }
             }
         } catch (error) {
             console.error("Error handling answer:", error);
+            setError("Failed to establish connection");
             setError("Failed to establish connection");
         }
     };
