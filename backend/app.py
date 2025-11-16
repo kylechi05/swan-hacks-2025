@@ -14,6 +14,8 @@ from src.create_event import create_event
 app = Flask(__name__, static_url_path='/static')
 app.config['SECRET_KEY'] = 'secret!'
 app.config['JWT_SECRET_KEY'] = 'password'
+app.config['JWT_TOKEN_LOCATION'] = ['headers']
+app.config['JWT_CSRF_CHECK_FORM'] = False
 
 # Enable CORS
 CORS(app)
@@ -96,22 +98,30 @@ def get_subjects():
 @app.route('/create_event', methods=['POST'])
 @jwt_required()
 def post_create_event():
-    userid_tutee = get_jwt_identity()  # Get userid from JWT token
-    available_start = request.json.get('available_start')
-    available_end = request.json.get('available_end')
-    category = request.json.get('category')
-    title = request.json.get('title')
-    description = request.json.get('description')
+    try:
+        userid_tutee = int(get_jwt_identity())  # Get userid from JWT token and convert to int
+        available_start = request.json.get('available_start')
+        available_end = request.json.get('available_end')
+        category = request.json.get('category')
+        title = request.json.get('title')
+        description = request.json.get('description')
 
-    eid = create_event(
-        userid_tutee,
-        available_start,
-        available_end,
-        category,
-        title,
-        description
-    )
-    return {'event_id': eid}, 200
+        print(f"Received data: userid={userid_tutee}, start={available_start}, end={available_end}, category={category}, title={title}")
+
+        eid = create_event(
+            userid_tutee,
+            available_start,
+            available_end,
+            category,
+            title,
+            description
+        )
+        return {'event_id': eid}, 200
+    except Exception as e:
+        print(f"Error in post_create_event: {e}")
+        import traceback
+        traceback.print_exc()
+        return {'error': str(e)}, 500
 
 
 if __name__ == "__main__":

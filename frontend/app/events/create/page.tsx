@@ -76,12 +76,14 @@ export default function CreateEvent() {
 
             if (!res.ok) {
                 const errorData = await res.json();
-                setError(errorData.message || "Failed to load subjects.");
+                console.error("Error response:", errorData);
+                setError(errorData.error || errorData.message || "Failed to create event.");
                 return;
             }
 
             const data = await res.json();
-            console.log(data)
+            console.log("Success:", data);
+            alert("Event created successfully!");
         } catch (err) {
             console.error("Request failed:", err);
             setError("Failed to connect to server.");

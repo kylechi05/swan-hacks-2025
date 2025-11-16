@@ -23,7 +23,7 @@ def login(email, password):
                 'name': result[3]
             }
             token = create_access_token(
-                identity=result[0],
+                identity=str(result[0]),  # Convert to string for JWT subject claim
                 additional_claims=additional_claims,
                 expires_delta=timedelta(hours=36)
             )
