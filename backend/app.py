@@ -775,6 +775,132 @@ def api_meeting_recordings(meeting_id):
         logger.error(f"Error fetching meeting recordings: {e}", exc_info=True)
         return {'error': str(e)}, 500
 
+# @app.route('/api/transcripts/meeting/summary/<meeting_id>', methods=['GET'])
+# def api_summary_transcripts(meeting_id):
+#     """API endpoint to get summary of transcripts for a specific meeting"""
+#     try:
+#         # Call the existing api_meeting_transcripts function
+#         response, status_code = api_meeting_transcripts(meeting_id)
+        
+#         if status_code != 200:
+#             return response, status_code
+        
+#         # Extract just the transcript objects from the response
+#         transcripts_list = []
+#         for transcript in response.get('transcripts', []):
+#             transcripts_list.append({
+#                 'participant_id': transcript.get('participant_id'),
+#                 'transcript': transcript.get('transcript', ''),
+#                 'word_count': transcript.get('word_count', 0)
+#             })
+        
+#         return {'meeting_id': meeting_id, 'transcripts': transcripts_list}, 200
+#     except Exception as e:
+#         logger.error(f"Error fetching summary transcripts: {e}", exc_info=True)
+#         return {'error': str(e)}, 500
+
+@app.route('/api/transcripts_stitched/meeting/<meeting_id>')
+def api_meeting_transcripts_stitched(meeting_id):
+    try:
+        # Call the existing api_meeting_transcripts function
+        result = api_meeting_transcripts(meeting_id)
+        
+        # Handle both return types: tuple (dict, status_code) or Response object
+        if isinstance(result, tuple):
+            # Base case: returns (dict, status_code)
+            response_data, status_code = result
+            if status_code != 200:
+                return response_data, status_code
+        elif hasattr(result, 'get_json'):
+            # Current case: returns Response object from jsonify()
+            response_data = result.get_json()
+        else:
+            # Fallback: assume it's already a dict
+            response_data = result
+        
+        # Validate we have transcripts
+        transcripts_data = response_data.get('transcripts', [])
+        if not transcripts_data:
+            return {'error': 'No transcripts found for this meeting'}, 404
+        
+        # Process words from all participants
+        all_words = []
+        participants_with_words = 0
+        
+        for transcript in transcripts_data:
+            participant_id = transcript.get('participant_id')
+            words = transcript.get('words', [])
+            
+            if not words:
+                logger.warning(f"Participant {participant_id} has no words in transcript")
+                continue
+            
+            participants_with_words += 1
+            
+            # Extract and normalize words from this participant
+            for word in words:
+                all_words.append({
+                    'word': word.get('word', ''),
+                    'participant_id': participant_id,
+                    'start': word.get('start_time', 0)
+                })
+        
+        # Check if we have any words to process
+        if not all_words:
+            return {
+                'error': 'No words found in any transcript',
+                'participant_count': len(transcripts_data)
+            }, 404
+        
+        logger.info(f"Processing {len(all_words)} words from {participants_with_words} participants")
+        
+        # Sort all words by timestamp
+        all_words.sort(key=lambda x: x['start'])
+        
+        # Group words into sentences by speaker
+        sentences = []
+        if all_words:
+            cur_pid = all_words[0]['participant_id']
+            cur_words = []
+            
+            for w in all_words:
+                if w['participant_id'] != cur_pid:
+                    # Speaker changed, finalize current sentence
+                    if cur_words:
+                        text = " ".join([x['word'] for x in cur_words]).strip()
+                        if text:  # Only add non-empty sentences
+                            sentences.append({
+                                'participant_id': cur_pid, 
+                                'text': text, 
+                                'start': cur_words[0]['start'], 
+                                'end': cur_words[-1]['start']
+                            })
+                    cur_pid = w['participant_id']
+                    cur_words = [w]
+                else:
+                    cur_words.append(w)
+            
+            # Don't forget the last sentence
+            if cur_words:
+                text = " ".join([x['word'] for x in cur_words]).strip()
+                if text:  # Only add non-empty sentences
+                    sentences.append({
+                        'participant_id': cur_pid, 
+                        'text': text, 
+                        'start': cur_words[0]['start'], 
+                        'end': cur_words[-1]['start']
+                    })
+
+        return {
+            'sentences': sentences, 
+            'sentence_count': len(sentences),
+            'participant_count': participants_with_words,
+            'total_words': len(all_words)
+        }, 200
+
+    except Exception as e:
+        logger.error(f"Error stitching meeting transcripts: {e}", exc_info=True)
+        return {'error': str(e)}, 500
 
 @app.route('/api/transcripts/meeting/<meeting_id>')
 def api_meeting_transcripts(meeting_id):
