@@ -13,11 +13,12 @@ export default function MeetingPage() {
     const [isCallActive, setIsCallActive] = useState(false);
     const [isScreenSharing, setIsScreenSharing] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [myStream, setMyStream] = useState<MediaStream | null>(null);
+    const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
 
     const socketRef = useRef<Socket | null>(null);
     const localVideoRef = useRef<HTMLVideoElement>(null);
     const remoteVideoRef = useRef<HTMLVideoElement>(null);
-    const screenShareVideoRef = useRef<HTMLVideoElement>(null);
     const localStreamRef = useRef<MediaStream | null>(null);
     const pc1Ref = useRef<RTCPeerConnection | null>(null);
     const pc2Ref = useRef<RTCPeerConnection | null>(null);
@@ -128,6 +129,19 @@ export default function MeetingPage() {
         };
     }, [meetingId]);
 
+    // Update video elements when streams change
+    useEffect(() => {
+        if (remoteVideoRef.current && remoteStream) {
+            remoteVideoRef.current.srcObject = remoteStream;
+        }
+    }, [remoteStream]);
+
+    useEffect(() => {
+        if (localVideoRef.current && myStream) {
+            localVideoRef.current.srcObject = myStream;
+        }
+    }, [myStream]);
+
     const handleOffer = async (data: { sdp: string; type: RTCSdpType }) => {
         try {
             // Get local stream if we don't have it
@@ -136,10 +150,8 @@ export default function MeetingPage() {
                     audio: true,
                     video: true,
                 });
-                if (localVideoRef.current) {
-                    localVideoRef.current.srcObject = stream;
-                }
                 localStreamRef.current = stream;
+                setMyStream(stream);
                 setIsCallActive(true);
             }
 
@@ -159,9 +171,9 @@ export default function MeetingPage() {
 
                 pc2Ref.current.addEventListener("track", (e) => {
                     console.log("Track received:", e.track.kind);
-                    if (remoteVideoRef.current && e.streams[0]) {
+                    if (e.streams[0]) {
                         console.log("Setting remote video stream");
-                        remoteVideoRef.current.srcObject = e.streams[0];
+                        setRemoteStream(e.streams[0]);
                     }
                 });
 
@@ -253,10 +265,8 @@ export default function MeetingPage() {
                 audio: true,
                 video: true,
             });
-            if (localVideoRef.current) {
-                localVideoRef.current.srcObject = stream;
-            }
             localStreamRef.current = stream;
+            setMyStream(stream);
             setIsCallActive(true);
 
             // Create peer connection
@@ -274,9 +284,9 @@ export default function MeetingPage() {
 
             pc1Ref.current.addEventListener("track", (e) => {
                 console.log("Track received:", e.track.kind);
-                if (remoteVideoRef.current && e.streams[0]) {
+                if (e.streams[0]) {
                     console.log("Setting remote video stream");
-                    remoteVideoRef.current.srcObject = e.streams[0];
+                    setRemoteStream(e.streams[0]);
                 }
             });
 
@@ -333,11 +343,6 @@ export default function MeetingPage() {
             const screenTrack = screenStream.getVideoTracks()[0];
             console.log("Got screen track:", screenTrack.id);
 
-            // Display screen share in dedicated video element
-            if (screenShareVideoRef.current) {
-                screenShareVideoRef.current.srcObject = screenStream;
-            }
-
             // Find active peer connection and replace video track
             const pc = pc1Ref.current || pc2Ref.current;
             if (pc) {
@@ -349,63 +354,47 @@ export default function MeetingPage() {
                 if (videoSender && localStreamRef.current) {
                     console.log("Replacing video track with screen share");
                     
-                    // Replace the track for peer connection
+                    // Replace the track
                     await videoSender.replaceTrack(screenTrack);
                     setIsScreenSharing(true);
+
+                    // Show screen share in local video
+                    setMyStream(screenStream);
 
                     console.log("Screen share track replaced successfully");
 
                     // Handle screen share stop
                     screenTrack.onended = async () => {
-                        await handleStopScreenShare(videoSender);
+                        console.log("Screen share ended, switching back to camera");
+                        const cameraTrack = localStreamRef.current
+                            ?.getVideoTracks()[0];
+                        if (cameraTrack && videoSender) {
+                            await videoSender.replaceTrack(cameraTrack);
+                            if (localStreamRef.current) {
+                                setMyStream(localStreamRef.current);
+                            }
+                            console.log("Switched back to camera");
+                        }
+                        setIsScreenSharing(false);
+                        
+                        // Stop screen stream tracks
+                        if (screenStreamRef.current) {
+                            screenStreamRef.current.getTracks().forEach(track => track.stop());
+                            screenStreamRef.current = null;
+                        }
                     };
                 } else {
                     console.error("Video sender not found or no local stream");
                     setError("Failed to find video track");
-                    screenStream.getTracks().forEach(track => track.stop());
                 }
             } else {
                 console.error("No active peer connection");
                 setError("No active connection");
-                screenStream.getTracks().forEach(track => track.stop());
             }
         } catch (error) {
             console.error("Error sharing screen:", error);
             setError("Failed to share screen");
         }
-    };
-
-    const handleStopScreenShare = async (videoSender?: RTCRtpSender) => {
-        console.log("Stopping screen share, switching back to camera");
-        
-        // Find the video sender if not provided
-        if (!videoSender) {
-            const pc = pc1Ref.current || pc2Ref.current;
-            if (pc) {
-                const senders = pc.getSenders();
-                videoSender = senders.find((sender) => sender.track?.kind === "video");
-            }
-        }
-
-        // Switch back to camera track
-        const cameraTrack = localStreamRef.current?.getVideoTracks()[0];
-        if (cameraTrack && videoSender) {
-            await videoSender.replaceTrack(cameraTrack);
-            console.log("Switched back to camera");
-        }
-        
-        // Clear screen share video element
-        if (screenShareVideoRef.current) {
-            screenShareVideoRef.current.srcObject = null;
-        }
-        
-        // Stop screen stream tracks
-        if (screenStreamRef.current) {
-            screenStreamRef.current.getTracks().forEach(track => track.stop());
-            screenStreamRef.current = null;
-        }
-        
-        setIsScreenSharing(false);
     };
 
     const handleHangup = () => {
@@ -431,10 +420,9 @@ export default function MeetingPage() {
             screenStreamRef.current = null;
         }
 
-        // Clear video elements
-        if (localVideoRef.current) localVideoRef.current.srcObject = null;
-        if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
-
+        // Clear state
+        setMyStream(null);
+        setRemoteStream(null);
         setIsCallActive(false);
         setIsScreenSharing(false);
     };
@@ -479,30 +467,26 @@ export default function MeetingPage() {
 
             {/* Video Container */}
             <div className="relative mx-8 my-6 h-[80vh] overflow-hidden rounded-xl bg-black">
-                {/* Remote Video (main view when not screen sharing) */}
-                <video
-                    ref={remoteVideoRef}
-                    autoPlay
-                    playsInline
-                    className={`h-full w-full object-contain ${isScreenSharing ? "hidden" : ""}`}
-                />
-
-                {/* Screen Share Video (main view when screen sharing) */}
-                <video
-                    ref={screenShareVideoRef}
-                    autoPlay
-                    playsInline
-                    className={`h-full w-full object-contain ${isScreenSharing ? "" : "hidden"}`}
-                />
+                {/* Remote Video (main view) */}
+                {remoteStream && (
+                    <video
+                        ref={remoteVideoRef}
+                        autoPlay
+                        playsInline
+                        className="h-full w-full object-contain"
+                    />
+                )}
 
                 {/* Local Video (picture-in-picture) */}
-                <video
-                    ref={localVideoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    className="absolute bottom-6 right-6 h-40 w-52 rounded-lg border-2 border-white object-cover shadow-lg"
-                />
+                {myStream && (
+                    <video
+                        ref={localVideoRef}
+                        autoPlay
+                        playsInline
+                        muted
+                        className="absolute bottom-6 right-6 h-40 w-52 rounded-lg border-2 border-white object-cover shadow-lg"
+                    />
+                )}
 
                 {/* Waiting message */}
                 {!isCallActive && (
@@ -532,11 +516,11 @@ export default function MeetingPage() {
                 </button>
 
                 <button
-                    onClick={isScreenSharing ? () => handleStopScreenShare() : handleShareScreen}
+                    onClick={handleShareScreen}
                     disabled={!isCallActive}
                     className="rounded-lg border-2 border-blue-600 bg-blue-600/20 px-6 py-3 font-semibold text-white transition-all hover:scale-105 hover:border-blue-500 hover:bg-blue-600/30 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
                 >
-                    {isScreenSharing ? "Stop Sharing" : "Share Screen"}
+                    {isScreenSharing ? "Sharing Screen" : "Share Screen"}
                 </button>
 
                 <button
