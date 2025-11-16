@@ -1,4 +1,5 @@
 import logging
+import asyncio
 from flask_socketio import SocketIO, send, emit, join_room, leave_room
 from flask import Flask, render_template, Response, request
 from flask_cors import CORS
@@ -13,6 +14,7 @@ from src.accept_tutor import accept_tutor
 from src.add_meeting import add_meeting
 from src.list_offers import list_offers
 from src.list_events import list_events, list_tutee_events, list_tutor_events
+from src.recording import meeting_recorder
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -25,15 +27,8 @@ app.config['JWT_SECRET_KEY'] = 'password'
 app.config['JWT_TOKEN_LOCATION'] = ['headers']
 app.config['JWT_CSRF_CHECK_FORM'] = False
 
-# Enable CORS with proper configuration
-CORS(app, resources={
-    r"/*": {
-        "origins": ["http://localhost:3000", "http://127.0.0.1:3000", "https://tutorl.ink"],
-        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization"],
-        "supports_credentials": True
-    }
-})
+# Enable CORS
+CORS(app)
 
 # Initialize JWT
 jwt = JWTManager(app)
@@ -55,6 +50,15 @@ def shutdown_session(exception=None):
 meeting_rooms = {}
 # Map session IDs to room IDs
 sid_to_room = {}
+
+# Helper function to run async code in sync context
+def run_async(coro):
+    """Run async coroutine in sync context."""
+    loop = asyncio.new_event_loop()
+    try:
+        return loop.run_until_complete(coro)
+    finally:
+        loop.close()
 
 @app.route('/')
 def index():
@@ -172,6 +176,13 @@ def handle_disconnect():
         if room_id:
             logger.info(f"User {sid} disconnecting from room {room_id}")
             
+            # Stop recording for this participant
+            try:
+                run_async(meeting_recorder.stop_recording(room_id, sid))
+                logger.info(f"Stopped recording for participant {sid}")
+            except Exception as e:
+                logger.error(f"Error stopping recording: {e}")
+            
             # Remove user from room
             if room_id in meeting_rooms:
                 if sid in meeting_rooms[room_id]['members']:
@@ -182,8 +193,12 @@ def handle_disconnect():
                 # Notify remaining members
                 emit('user-left', {'member_count': member_count}, room=room_id)
                 
-                # Clean up empty rooms
+                # Clean up empty rooms and stop all recordings
                 if member_count == 0:
+                    try:
+                        run_async(meeting_recorder.stop_meeting_recording(room_id))
+                    except Exception as e:
+                        logger.error(f"Error stopping meeting recording: {e}")
                     del meeting_rooms[room_id]
                     logger.info(f"Room {room_id} is empty, removing it")
             
@@ -195,6 +210,59 @@ def handle_disconnect():
         
     except Exception as e:
         logger.error(f"Error in handle_disconnect: {e}", exc_info=True)
+
+
+@socketio.on('recorder-offer')
+def handle_recorder_offer(data):
+    """Handle WebRTC offer from client for server-side recording"""
+    try:
+        sid = request.sid
+        room_id = sid_to_room.get(sid)
+        
+        if not room_id:
+            emit('error', {'message': 'Not in a meeting room'})
+            return
+        
+        logger.info(f"Received recorder offer from {sid} in room {room_id}")
+        
+        async def process_offer():
+            # Create or get recording session
+            session = meeting_recorder.get_session(room_id, sid)
+            if not session:
+                session = await meeting_recorder.start_recording(room_id, sid)
+            
+            # Handle the offer and get answer
+            answer = await session.handle_offer(data)
+            return answer
+        
+        # Process offer and send answer
+        answer = run_async(process_offer())
+        emit('recorder-answer', answer)
+        logger.info(f"Sent recorder answer to {sid}")
+        
+    except Exception as e:
+        logger.error(f"Error in handle_recorder_offer: {e}", exc_info=True)
+        emit('error', {'message': 'Failed to process recorder offer'})
+
+
+@socketio.on('recorder-ice-candidate')
+def handle_recorder_ice_candidate(data):
+    """Handle ICE candidate from client for server-side recording"""
+    try:
+        sid = request.sid
+        room_id = sid_to_room.get(sid)
+        
+        if not room_id:
+            return
+        
+        logger.info(f"Received recorder ICE candidate from {sid}")
+        
+        session = meeting_recorder.get_session(room_id, sid)
+        if session:
+            run_async(session.add_ice_candidate(data))
+        
+    except Exception as e:
+        logger.error(f"Error in handle_recorder_ice_candidate: {e}", exc_info=True)
 
 
 
@@ -276,13 +344,7 @@ def get_event_offer(event_id):
 # Accept a tutor for an event
 @app.route('/event/<int:event_id>/accept', methods=['POST'])
 @jwt_required()
-
 def accept_event_offer(event_id):
-    
-    # Handle preflight request
-    if request.method == 'OPTIONS':
-        return '', 200
-    
     accepted_tutor = accept_tutor(
         eventid=event_id,
         userid_tutor=request.json.get('userid_tutor')
