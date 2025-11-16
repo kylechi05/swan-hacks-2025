@@ -1,21 +1,61 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation"
+import { useRouter } from "next/navigation";
+
+function formatDate(date: number | string) {
+    const value = typeof date === "number" ? date * 1000 : date;
+    return new Intl.DateTimeFormat("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+        timeZoneName: "short",
+    }).format(new Date(value));
+}
+function toLocalDatetimeInputFromUTC(value: string | number) {
+    let d: Date;
+
+    if (typeof value === "number") {
+        d = new Date(value * 1000);
+    } else {
+        d = new Date(value); // ISO string is parsed correctly
+    }
+
+    if (isNaN(d.getTime())) return "";
+
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const year = d.getFullYear();
+    const month = pad(d.getMonth() + 1);
+    const day = pad(d.getDate());
+    const hours = pad(d.getHours());
+    const minutes = pad(d.getMinutes());
+
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+function localDatetimeToUnix(dt: string) {
+    // dt = "YYYY-MM-DDTHH:mm" (local time)
+    const d = new Date(dt);
+    return Math.floor(d.getTime() / 1000);
+}
 
 export function Event({ event, token }) {
     const [isOpen, setIsOpen] = useState(false);
-    const [startTime, setStartTime] = useState<string>("");
-    const [endTime, setEndTime] = useState<string>("");
+
     const [error, setError] = useState<string>("");
     const router = useRouter();
 
-    const minTime = new Date(event.available_start_time)
-        .toISOString()
-        .slice(0, 16);
-    const maxTime = new Date(event.available_end_time)
-        .toISOString()
-        .slice(0, 16);
+    const [startTime, setStartTime] = useState<string>(
+        toLocalDatetimeInputFromUTC(event.available_start_time),
+    );
+    const [endTime, setEndTime] = useState<string>(
+        toLocalDatetimeInputFromUTC(event.available_end_time),
+    );
+    const minTime = toLocalDatetimeInputFromUTC(event.available_start_time);
+    const maxTime = toLocalDatetimeInputFromUTC(event.available_end_time);
 
     async function handleConfirmOffer() {
         setError("");
@@ -31,8 +71,9 @@ export function Event({ event, token }) {
         }
 
         try {
-            const startUnix = Math.floor(new Date(startTime).getTime() / 1000);
-            const endUnix = Math.floor(new Date(endTime).getTime() / 1000);
+            const startUnix = localDatetimeToUnix(startTime);
+            const endUnix = localDatetimeToUnix(endTime);
+
             const res = await fetch(
                 `https://api.tutorl.ink/event/${event.eventid}/offer`,
                 {
@@ -55,7 +96,7 @@ export function Event({ event, token }) {
             setStartTime("");
             setEndTime("");
             setIsOpen(false);
-            router.push(`/events/success?event_id=${data.event_id}&from=tutor`)
+            router.push(`/events/success?event_id=${data.event_id}&from=tutor`);
         } catch (err) {
             console.error("Request failed:", err);
             setError("Request failed. Please try again.");
@@ -66,8 +107,20 @@ export function Event({ event, token }) {
         <div className="flex flex-col">
             <div className="flex items-center justify-between">
                 <div>
-                    <h2 className="text-lg font-bold text-green-600">{event.title}</h2>
-                    <p className="text-sm text-(--off-white)">{event.category}</p>
+                    <h2 className="text-lg font-bold text-green-600">
+                        {event.title}
+                    </h2>
+                    <p className="text-sm text-(--off-white)">
+                        {event.category}
+                    </p>
+                    <p className="text-sm text-(--light-gray)">
+                        Available start time:{" "}
+                        {formatDate(event.available_start_time)}
+                    </p>
+                    <p className="text-sm text-(--light-gray)">
+                        Available end time:{" "}
+                        {formatDate(event.available_end_time)}
+                    </p>
                 </div>
                 <button
                     onClick={() => setIsOpen(!isOpen)}
