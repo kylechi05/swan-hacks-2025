@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Montserrat, Elms_Sans, Noto_Sans } from "next/font/google";
+import { Montserrat, Elms_Sans, Poppins } from "next/font/google";
 import "./globals.css";
 
 import { NavBar } from "./components/NavBar";
@@ -16,10 +16,6 @@ const elms_sans = Elms_Sans({
     variable: "--font-elms-sans",
 });
 
-const noto_sans = Noto_Sans({
-    subsets: ["latin"],
-    variable: "--font-noto-sans",
-})
 
 export const metadata: Metadata = {
     title: "TutorLink",
@@ -34,7 +30,7 @@ export default function RootLayout({
     return (
         <html lang="en">
             <body
-                className={`${montserrat.variable} ${elms_sans.variable} ${noto_sans.variable} font-noto-sans antialiased bg-(--background) relative`}
+                className={`${montserrat.variable} ${elms_sans.variable} font-elms-sans antialiased bg-(--background) relative`}
             >
                 <AuthProvider>
                     <NavBar />
