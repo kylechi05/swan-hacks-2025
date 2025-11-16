@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { io, Socket } from "socket.io-client";
-import VideoPlayer from "@/app/components/VideoPlayer";
 
 export default function MeetingPage() {
     const params = useParams();
@@ -12,7 +11,6 @@ export default function MeetingPage() {
     const [isConnected, setIsConnected] = useState(false);
     const [memberCount, setMemberCount] = useState(0);
     const [isCallActive, setIsCallActive] = useState(false);
-    const [isScreenSharing, setIsScreenSharing] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [myStream, setMyStream] = useState<MediaStream | null>(null);
     const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
@@ -24,7 +22,18 @@ export default function MeetingPage() {
     const localStreamRef = useRef<MediaStream | null>(null);
     const pc1Ref = useRef<RTCPeerConnection | null>(null);
     const pc2Ref = useRef<RTCPeerConnection | null>(null);
-    const screenStreamRef = useRef<MediaStream | null>(null);
+
+    useEffect(() => {
+        if (localVideoRef.current && myStream) {
+            localVideoRef.current.srcObject = myStream;
+        }
+    }, [myStream]);
+
+    useEffect(() => {
+        if (remoteVideoRef.current && remoteStream) {
+            remoteVideoRef.current.srcObject = remoteStream;
+        }
+    }, [remoteStream]);
 
     const configuration: RTCConfiguration = {
         iceServers: [
@@ -342,99 +351,7 @@ export default function MeetingPage() {
         }
     };
 
-    const handleShareScreen = async () => {
-        try {
-            console.log("Starting screen share...");
-            const screenStream = await navigator.mediaDevices.getDisplayMedia({
-                video: { cursor: "always" } as MediaTrackConstraints,
-                audio: false,
-            });
 
-            screenStreamRef.current = screenStream;
-            const screenTrack = screenStream.getVideoTracks()[0];
-            console.log("Got screen track:", screenTrack.id);
-
-            // Find active peer connection and replace video track
-            const pc = pc1Ref.current || pc2Ref.current;
-            if (pc) {
-                const senders = pc.getSenders();
-                const videoSender = senders.find((sender) =>
-                    sender.track?.kind === "video"
-                );
-
-                if (videoSender && localStreamRef.current) {
-                    console.log("Replacing video track with screen share");
-                    const oldTrack = videoSender.track;
-                    
-                    // Replace the track
-                    await videoSender.replaceTrack(screenTrack);
-                    
-                    // Stop the old camera track
-                    if (oldTrack) {
-                        oldTrack.stop();
-                    }
-                    
-                    setIsScreenSharing(true);
-
-                    // Show screen share in local video
-                    setMyStream(screenStream);
-
-                    console.log("Screen share track replaced successfully");
-
-                    // Handle screen share stop
-                    screenTrack.onended = async () => {
-                        console.log("Screen share ended, switching back to camera");
-                        try {
-                            // Get a fresh camera stream
-                            const newCameraStream = await navigator.mediaDevices.getUserMedia({
-                                audio: true,
-                                video: true,
-                            });
-                            
-                            const newVideoTrack = newCameraStream.getVideoTracks()[0];
-                            const newAudioTrack = newCameraStream.getAudioTracks()[0];
-                            
-                            // Update local stream ref
-                            localStreamRef.current = newCameraStream;
-                            
-                            // Replace video track
-                            if (videoSender) {
-                                await videoSender.replaceTrack(newVideoTrack);
-                            }
-                            
-                            // Also replace audio track if it exists
-                            const audioSender = pc.getSenders().find(s => s.track?.kind === "audio");
-                            if (audioSender) {
-                                await audioSender.replaceTrack(newAudioTrack);
-                            }
-                            
-                            setMyStream(newCameraStream);
-                            console.log("Switched back to camera");
-                        } catch (err) {
-                            console.error("Error switching back to camera:", err);
-                        }
-                        
-                        setIsScreenSharing(false);
-                        
-                        // Stop screen stream tracks
-                        if (screenStreamRef.current) {
-                            screenStreamRef.current.getTracks().forEach(track => track.stop());
-                            screenStreamRef.current = null;
-                        }
-                    };
-                } else {
-                    console.error("Video sender not found or no local stream");
-                    setError("Failed to find video track");
-                }
-            } else {
-                console.error("No active peer connection");
-                setError("No active connection");
-            }
-        } catch (error) {
-            console.error("Error sharing screen:", error);
-            setError("Failed to share screen");
-        }
-    };
 
     const handleHangup = () => {
         // Close peer connections
@@ -452,18 +369,11 @@ export default function MeetingPage() {
             localStreamRef.current.getTracks().forEach((track) => track.stop());
             localStreamRef.current = null;
         }
-        if (screenStreamRef.current) {
-            screenStreamRef.current.getTracks().forEach((track) =>
-                track.stop()
-            );
-            screenStreamRef.current = null;
-        }
 
         // Clear state
         setMyStream(null);
         setRemoteStream(null);
         setIsCallActive(false);
-        setIsScreenSharing(false);
     };
 
     return (
@@ -508,20 +418,40 @@ export default function MeetingPage() {
             <div className="relative mx-8 my-6 h-[80vh] overflow-hidden rounded-xl bg-black">
                 {/* Remote Video (main view) */}
                 {remoteStream && (
-                    <VideoPlayer 
-                        stream={remoteStream} 
-                        name="Remote Stream" 
-                        isAudioMute={isAudioMute}
-                    />
+                    <div className="px-2">
+                        <h1 className="text-sm font-poppins font-semibold md:text-xl mb-1 text-center mt-4">
+                            Remote Stream
+                        </h1>
+                        <div className="relative rounded-[30px] overflow-hidden mxs:h-[450px] mss:h-[500px] mmd:h-[600px] md:w-[800px] md:h-[500px]">
+                            <video
+                                ref={remoteVideoRef}
+                                autoPlay
+                                playsInline
+                                muted={false}
+                                className="h-full w-full object-cover"
+                                style={{ transform: 'scaleX(-1)' }}
+                            />
+                        </div>
+                    </div>
                 )}
 
                 {/* Local Video (picture-in-picture) */}
                 {myStream && (
-                    <VideoPlayer 
-                        stream={myStream} 
-                        name="My Stream" 
-                        isAudioMute={isAudioMute}
-                    />
+                    <div className="flex flex-col items-center justify-center absolute top-2 right-3 z-10">
+                        <h1 className="text-sm font-poppins font-semibold md:text-xl mb-1 text-center mt-1">
+                            My Stream
+                        </h1>
+                        <div className="relative rounded-[30px] overflow-hidden mxs:w-[80px] mxs:h-[120px] msm:w-[100px] msm:rounded-md msm:h-[140px] mmd:w-[140px] md:w-[200px] lg:w-[280px]">
+                            <video
+                                ref={localVideoRef}
+                                autoPlay
+                                playsInline
+                                muted={true}
+                                className="h-full w-full object-cover"
+                                style={{ transform: 'scaleX(-1)' }}
+                            />
+                        </div>
+                    </div>
                 )}
 
                 {/* Waiting message */}
@@ -549,14 +479,6 @@ export default function MeetingPage() {
                     className="rounded-lg bg-green-600 px-6 py-3 font-semibold text-white transition-all hover:scale-105 hover:bg-green-500 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100 disabled:hover:bg-green-600"
                 >
                     {isCallActive ? "Call Active" : "Start Call"}
-                </button>
-
-                <button
-                    onClick={handleShareScreen}
-                    disabled={!isCallActive}
-                    className="rounded-lg border-2 border-blue-600 bg-blue-600/20 px-6 py-3 font-semibold text-white transition-all hover:scale-105 hover:border-blue-500 hover:bg-blue-600/30 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
-                >
-                    {isScreenSharing ? "Sharing Screen" : "Share Screen"}
                 </button>
 
                 <button
