@@ -514,8 +514,13 @@ export default function MeetingPage() {
                             label: screenTrack.label
                         });
 
-                        // The negotiationneeded event handler will automatically trigger renegotiation
-                        console.log("[Screen Share] Track replaced, negotiationneeded will handle renegotiation");
+                        // For PC1, manually trigger renegotiation since replaceTrack doesn't always fire negotiationneeded
+                        if (pc1Ref.current) {
+                            console.log("[Screen Share] PC1 detected - manually triggering renegotiation");
+                            await runOfferAnswer(pc1Ref.current);
+                        } else {
+                            console.log("[Screen Share] PC2 detected - negotiationneeded should handle on remote peer");
+                        }
                         
                         setIsScreenSharing(true);
 
@@ -541,8 +546,13 @@ export default function MeetingPage() {
                                 });
                                 await videoSender.replaceTrack(cameraTrack);
 
-                                // The negotiationneeded event handler will automatically trigger renegotiation
-                                console.log("[Screen Share] Camera track replaced, negotiationneeded will handle renegotiation");
+                                // For PC1, manually trigger renegotiation when switching back
+                                if (pc1Ref.current) {
+                                    console.log("[Screen Share] PC1 detected - manually triggering renegotiation to switch back to camera");
+                                    await runOfferAnswer(pc1Ref.current);
+                                } else {
+                                    console.log("[Screen Share] PC2 detected - negotiationneeded should handle on remote peer");
+                                }
 
                                 if (
                                     localVideoRef.current && localStreamRef.current
