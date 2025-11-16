@@ -11,10 +11,8 @@ export default function MeetingPage() {
     const [isConnected, setIsConnected] = useState(false);
     const [memberCount, setMemberCount] = useState(0);
     const [isCallActive, setIsCallActive] = useState(false);
+    const [isScreenSharing, setIsScreenSharing] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [myStream, setMyStream] = useState<MediaStream | null>(null);
-    const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
-    const [isAudioMute, setIsAudioMute] = useState(false);
 
     const socketRef = useRef<Socket | null>(null);
     const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -22,18 +20,7 @@ export default function MeetingPage() {
     const localStreamRef = useRef<MediaStream | null>(null);
     const pc1Ref = useRef<RTCPeerConnection | null>(null);
     const pc2Ref = useRef<RTCPeerConnection | null>(null);
-
-    useEffect(() => {
-        if (localVideoRef.current && myStream) {
-            localVideoRef.current.srcObject = myStream;
-        }
-    }, [myStream]);
-
-    useEffect(() => {
-        if (remoteVideoRef.current && remoteStream) {
-            remoteVideoRef.current.srcObject = remoteStream;
-        }
-    }, [remoteStream]);
+    const screenStreamRef = useRef<MediaStream | null>(null);
 
     const configuration: RTCConfiguration = {
         iceServers: [
@@ -148,12 +135,14 @@ export default function MeetingPage() {
                     audio: true,
                     video: true,
                 });
+                if (localVideoRef.current) {
+                    localVideoRef.current.srcObject = stream;
+                }
                 localStreamRef.current = stream;
-                setMyStream(stream);
                 setIsCallActive(true);
             }
 
-            // Create peer connection if needed
+            // Create peer connection
             if (!pc2Ref.current) {
                 pc2Ref.current = new RTCPeerConnection(configuration);
 
@@ -169,16 +158,14 @@ export default function MeetingPage() {
 
                 pc2Ref.current.addEventListener("track", (e) => {
                     console.log("Track received:", e.track.kind);
-                    if (e.streams[0]) {
+                    if (remoteVideoRef.current && e.streams[0]) {
                         console.log("Setting remote video stream");
-                        setRemoteStream(e.streams[0]);
+                        remoteVideoRef.current.srcObject = e.streams[0];
                     }
                 });
 
                 pc2Ref.current.addEventListener("negotiationneeded", async () => {
-                    console.log("Negotiation needed on pc2 (answerer side) - waiting for offer");
-                    // Don't create offers when we're the answerer
-                    // The remote peer will send us a new offer which we'll handle in handleOffer
+                    console.log("Negotiation needed on pc2");
                 });
 
                 // Add local stream
@@ -192,48 +179,17 @@ export default function MeetingPage() {
                 }
             }
 
-            // Handle the offer - works for both initial connection and renegotiation
-            if (pc2Ref.current) {
-                // Check if we can set remote description
-                const validStates = ["stable", "have-remote-offer"];
-                if (validStates.includes(pc2Ref.current.signalingState)) {
-                    console.log(`Setting remote offer in state: ${pc2Ref.current.signalingState}`);
-                    await pc2Ref.current.setRemoteDescription(
-                        new RTCSessionDescription(data),
-                    );
-                    const answer = await pc2Ref.current.createAnswer();
-                    await pc2Ref.current.setLocalDescription(answer);
+            await pc2Ref.current.setRemoteDescription(
+                new RTCSessionDescription(data),
+            );
+            const answer = await pc2Ref.current.createAnswer();
+            await pc2Ref.current.setLocalDescription(answer);
 
-                    if (socketRef.current) {
-                        socketRef.current.emit("answer", {
-                            sdp: pc2Ref.current.localDescription!.sdp,
-                            type: pc2Ref.current.localDescription!.type,
-                        });
-                    }
-                    console.log("Successfully handled offer and sent answer");
-                } else {
-                    console.warn(
-                        `Cannot set remote offer in state ${pc2Ref.current.signalingState}, will retry`,
-                    );
-                    // If we're in have-local-offer state, we need to do rollback
-                    if (pc2Ref.current.signalingState === "have-local-offer") {
-                        await pc2Ref.current.setLocalDescription({ type: "rollback" } as RTCSessionDescriptionInit);
-                        // Now retry setting the remote offer
-                        await pc2Ref.current.setRemoteDescription(
-                            new RTCSessionDescription(data),
-                        );
-                        const answer = await pc2Ref.current.createAnswer();
-                        await pc2Ref.current.setLocalDescription(answer);
-
-                        if (socketRef.current) {
-                            socketRef.current.emit("answer", {
-                                sdp: pc2Ref.current.localDescription!.sdp,
-                                type: pc2Ref.current.localDescription!.type,
-                            });
-                        }
-                        console.log("Successfully handled offer after rollback");
-                    }
-                }
+            if (socketRef.current) {
+                socketRef.current.emit("answer", {
+                    sdp: pc2Ref.current.localDescription!.sdp,
+                    type: pc2Ref.current.localDescription!.type,
+                });
             }
         } catch (error) {
             console.error("Error handling offer:", error);
@@ -244,33 +200,12 @@ export default function MeetingPage() {
     const handleAnswer = async (data: { sdp: string; type: RTCSdpType }) => {
         try {
             if (pc1Ref.current) {
-                // Check if we're in a valid state to receive an answer
-                if (pc1Ref.current.signalingState === "have-local-offer") {
-                    await pc1Ref.current.setRemoteDescription(
-                        new RTCSessionDescription(data),
-                    );
-                    console.log("Successfully set remote answer");
-                } else {
-                    console.warn(
-                        `Cannot set remote answer in state ${pc1Ref.current.signalingState}`,
-                    );
-                }
-                // Check if we're in a valid state to receive an answer
-                if (pc1Ref.current.signalingState === "have-local-offer") {
-                    await pc1Ref.current.setRemoteDescription(
-                        new RTCSessionDescription(data),
-                    );
-                    console.log("Successfully set remote answer");
-                } else {
-                    console.warn(
-                        `Cannot set remote answer in state ${pc1Ref.current.signalingState}`,
-                    );
-                }
+                await pc1Ref.current.setRemoteDescription(
+                    new RTCSessionDescription(data),
+                );
             }
         } catch (error) {
             console.error("Error handling answer:", error);
-            setError("Failed to establish connection");
-            setError("Failed to establish connection");
         }
     };
 
@@ -297,8 +232,10 @@ export default function MeetingPage() {
                 audio: true,
                 video: true,
             });
+            if (localVideoRef.current) {
+                localVideoRef.current.srcObject = stream;
+            }
             localStreamRef.current = stream;
-            setMyStream(stream);
             setIsCallActive(true);
 
             // Create peer connection
@@ -316,9 +253,9 @@ export default function MeetingPage() {
 
             pc1Ref.current.addEventListener("track", (e) => {
                 console.log("Track received:", e.track.kind);
-                if (e.streams[0]) {
+                if (remoteVideoRef.current && e.streams[0]) {
                     console.log("Setting remote video stream");
-                    setRemoteStream(e.streams[0]);
+                    remoteVideoRef.current.srcObject = e.streams[0];
                 }
             });
 
@@ -363,7 +300,76 @@ export default function MeetingPage() {
         }
     };
 
+    const handleShareScreen = async () => {
+        try {
+            console.log("Starting screen share...");
+            const screenStream = await navigator.mediaDevices.getDisplayMedia({
+                video: { cursor: "always" } as MediaTrackConstraints,
+                audio: false,
+            });
 
+            screenStreamRef.current = screenStream;
+            const screenTrack = screenStream.getVideoTracks()[0];
+            console.log("Got screen track:", screenTrack.id);
+
+            // Find active peer connection and replace video track
+            const pc = pc1Ref.current || pc2Ref.current;
+            if (pc) {
+                const senders = pc.getSenders();
+                const videoSender = senders.find((sender) =>
+                    sender.track?.kind === "video"
+                );
+
+                if (videoSender && localStreamRef.current) {
+                    console.log("Replacing video track with screen share");
+                    
+                    // Replace the track
+                    await videoSender.replaceTrack(screenTrack);
+                    setIsScreenSharing(true);
+
+                    // Show screen share in local video
+                    if (localVideoRef.current) {
+                        localVideoRef.current.srcObject = screenStream;
+                    }
+
+                    console.log("Screen share track replaced successfully");
+
+                    // Handle screen share stop
+                    screenTrack.onended = async () => {
+                        console.log("Screen share ended, switching back to camera");
+                        const cameraTrack = localStreamRef.current
+                            ?.getVideoTracks()[0];
+                        if (cameraTrack && videoSender) {
+                            await videoSender.replaceTrack(cameraTrack);
+                            if (
+                                localVideoRef.current && localStreamRef.current
+                            ) {
+                                localVideoRef.current.srcObject =
+                                    localStreamRef.current;
+                            }
+                            console.log("Switched back to camera");
+                        }
+                        setIsScreenSharing(false);
+                        
+                        // Stop screen stream tracks
+                        if (screenStreamRef.current) {
+                            screenStreamRef.current.getTracks().forEach(track => track.stop());
+                            screenStreamRef.current = null;
+                        }
+                    };
+                } else {
+                    console.error("Video sender not found or no local stream");
+                    setError("Failed to find video track");
+                }
+            } else {
+                console.error("No active peer connection");
+                setError("No active connection");
+            }
+        } catch (error) {
+            console.error("Error sharing screen:", error);
+            setError("Failed to share screen");
+        }
+    };
 
     const handleHangup = () => {
         // Close peer connections
@@ -381,11 +387,19 @@ export default function MeetingPage() {
             localStreamRef.current.getTracks().forEach((track) => track.stop());
             localStreamRef.current = null;
         }
+        if (screenStreamRef.current) {
+            screenStreamRef.current.getTracks().forEach((track) =>
+                track.stop()
+            );
+            screenStreamRef.current = null;
+        }
 
-        // Clear state
-        setMyStream(null);
-        setRemoteStream(null);
+        // Clear video elements
+        if (localVideoRef.current) localVideoRef.current.srcObject = null;
+        if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
+
         setIsCallActive(false);
+        setIsScreenSharing(false);
     };
 
     return (
@@ -429,42 +443,21 @@ export default function MeetingPage() {
             {/* Video Container */}
             <div className="relative mx-8 my-6 h-[80vh] overflow-hidden rounded-xl bg-black">
                 {/* Remote Video (main view) */}
-                {remoteStream && (
-                    <div className="px-2">
-                        <h1 className="text-sm font-poppins font-semibold md:text-xl mb-1 text-center mt-4">
-                            Remote Stream
-                        </h1>
-                        <div className="relative rounded-[30px] overflow-hidden mxs:h-[450px] mss:h-[500px] mmd:h-[600px] md:w-[800px] md:h-[500px]">
-                            <video
-                                ref={remoteVideoRef}
-                                autoPlay
-                                playsInline
-                                muted={false}
-                                className="h-full w-full object-cover"
-                                style={{ transform: 'scaleX(-1)' }}
-                            />
-                        </div>
-                    </div>
-                )}
+                <video
+                    ref={remoteVideoRef}
+                    autoPlay
+                    playsInline
+                    className="h-full w-full object-contain"
+                />
 
                 {/* Local Video (picture-in-picture) */}
-                {myStream && (
-                    <div className="flex flex-col items-center justify-center absolute top-2 right-3 z-10">
-                        <h1 className="text-sm font-poppins font-semibold md:text-xl mb-1 text-center mt-1">
-                            My Stream
-                        </h1>
-                        <div className="relative rounded-[30px] overflow-hidden mxs:w-[80px] mxs:h-[120px] msm:w-[100px] msm:rounded-md msm:h-[140px] mmd:w-[140px] md:w-[200px] lg:w-[280px]">
-                            <video
-                                ref={localVideoRef}
-                                autoPlay
-                                playsInline
-                                muted={true}
-                                className="h-full w-full object-cover"
-                                style={{ transform: 'scaleX(-1)' }}
-                            />
-                        </div>
-                    </div>
-                )}
+                <video
+                    ref={localVideoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="absolute bottom-6 right-6 h-40 w-52 rounded-lg border-2 border-white object-cover shadow-lg"
+                />
 
                 {/* Waiting message */}
                 {!isCallActive && (
@@ -491,6 +484,14 @@ export default function MeetingPage() {
                     className="rounded-lg bg-green-600 px-6 py-3 font-semibold text-white transition-all hover:scale-105 hover:bg-green-500 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100 disabled:hover:bg-green-600"
                 >
                     {isCallActive ? "Call Active" : "Start Call"}
+                </button>
+
+                <button
+                    onClick={handleShareScreen}
+                    disabled={!isCallActive}
+                    className="rounded-lg border-2 border-blue-600 bg-blue-600/20 px-6 py-3 font-semibold text-white transition-all hover:scale-105 hover:border-blue-500 hover:bg-blue-600/30 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
+                >
+                    {isScreenSharing ? "Sharing Screen" : "Share Screen"}
                 </button>
 
                 <button
