@@ -36,7 +36,7 @@ class MediaRecorderSession:
         self.audio_track: Optional[MediaStreamTrack] = None
         self.output_file: Optional[str] = None
         self.is_recording = False
-        self._start_lock = asyncio.Lock()
+        self.delayed_check_scheduled = False # Add this flag
         
     async def start(self):
         """Initialize the peer connection for recording."""
@@ -50,7 +50,7 @@ class MediaRecorderSession:
         )
         
         @self.pc.on("track")
-        async def on_track(track: MediaStreamTrack):
+        async def on_track(track):
             logger.info(f"[Recording] Received track {track.kind} for participant {self.participant_id}")
             
             if track.kind == "video":
@@ -58,51 +58,60 @@ class MediaRecorderSession:
             elif track.kind == "audio":
                 self.audio_track = track
             
-            # Use a lock to prevent race conditions when starting the recorder
-            async with self._start_lock:
-                # If recorder exists, try to add the new track.
-                # Note: aiortc's MediaRecorder doesn't support adding tracks dynamically
-                # after it has started. This is a placeholder for that logic if the
-                # library is updated in the future. For now, we start with what we have.
-                if self.recorder and not self.is_recording:
-                    pass # Future: self.recorder.addTrack(track)
-
-                # If not recording, and we have at least one track, start recording.
-                if not self.is_recording and (self.video_track or self.audio_track):
-                    logger.info(f"[Recording] At least one track received, starting recording for {self.participant_id}")
-                    await self._start_recording()
-
+            # Start recording immediately if we have both
+            if not self.is_recording and self.video_track and self.audio_track:
+                logger.info(f"[Recording] Both tracks received, starting recording for {self.participant_id}")
+                await self._start_recording()
+            
+            # Otherwise, if not recording and no check is scheduled, schedule one
+            elif not self.is_recording and not self.delayed_check_scheduled:
+                logger.info(f"[Recording] Waiting for more tracks, scheduling delayed check for {self.participant_id}.")
+                self.delayed_check_scheduled = True
+                asyncio.create_task(self._delayed_start_check())
+            
             @track.on("ended")
             async def on_ended():
                 logger.info(f"Track {track.kind} ended for participant {self.participant_id}")
-                # The recorder will stop automatically when all tracks end.
-                # We can also force a stop if needed.
                 await self.stop()
         
         @self.pc.on("connectionstatechange")
         async def on_connectionstatechange():
-            if self.pc:
-                logger.info(f"Connection state for {self.participant_id}: {self.pc.connectionState}")
-                if self.pc.connectionState in ["failed", "closed", "disconnected"]:
-                    await self.stop()
+            logger.info(f"Connection state for {self.participant_id}: {self.pc.connectionState}")
+            if self.pc.connectionState in ["failed", "closed"]:
+                await self.stop()
         
         @self.pc.on("iceconnectionstatechange")
         async def on_iceconnectionstatechange():
-            if self.pc:
-                logger.info(f"ICE connection state for {self.participant_id}: {self.pc.iceConnectionState}")
+            logger.info(f"ICE connection state for {self.participant_id}: {self.pc.iceConnectionState}")
         
         @self.pc.on("icegatheringstatechange")
         async def on_icegatheringstatechange():
-            if self.pc:
-                logger.info(f"ICE gathering state for {self.participant_id}: {self.pc.iceGatheringState}")
+            logger.info(f"ICE gathering state for {self.participant_id}: {self.pc.iceGatheringState}")
         
         logger.info(f"Recording session initialized for participant {self.participant_id}")
     
+    async def _delayed_start_check(self):
+        """
+        Check if we can start recording after a delay.
+        This will start recording if *at least one* track is present.
+        """
+        await asyncio.sleep(2.0)  # Wait 2 seconds
+        self.delayed_check_scheduled = False # Reset flag
+        
+        # MODIFIED: Start if *at least one* track is available
+        if not self.is_recording and (self.video_track or self.audio_track):
+            logger.info(f"[Recording] Delayed check: At least one track available for {self.participant_id}, starting recording")
+            await self._start_recording()
+        elif not self.is_recording:
+            logger.warning(f"[Recording] Delayed check: Still missing tracks for {self.participant_id}. video={bool(self.video_track)}, audio={bool(self.audio_track)}")
     async def _start_recording(self):
         """Start the media recorder with available tracks."""
         if self.is_recording:
             return
             
+        # Reset this flag in case we started before the delayed check ran
+        self.delayed_check_scheduled = False 
+        
         # Add check to ensure we have at least one track
         if not self.video_track and not self.audio_track:
             logger.error(f"[Recording] _start_recording called for {self.participant_id} but no tracks are available.")
@@ -110,19 +119,17 @@ class MediaRecorderSession:
             
         try:            
             self.recorder = MediaRecorder(self.output_file, format="mp4")
-            
-            # Add whichever tracks are available at the time of starting
             if self.video_track:
                 self.recorder.addTrack(self.video_track)
                 logger.info(f"[Recording] Added video track to recorder for {self.participant_id}")
             else:
-                logger.warning(f"[Recording] No video track available for {self.participant_id}, starting with audio only.")
+                logger.warning(f"[Recording] No video track available for {self.participant_id}")
             
             if self.audio_track:
                 self.recorder.addTrack(self.audio_track)
                 logger.info(f"[Recording] Added audio track to recorder for {self.participant_id}")
             else:
-                logger.warning(f"[Recording] No audio track available for {self.participant_id}, starting with video only.")
+                logger.warning(f"[Recording] No audio track available for {self.participant_id}")
             
             await self.recorder.start()
             self.is_recording = True
