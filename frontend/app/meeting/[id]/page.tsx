@@ -27,20 +27,25 @@ export default function MeetingPage() {
             { urls: 'stun:stun.l.google.com:19302' },
             { urls: 'stun:stun1.l.google.com:19302' },
             { urls: 'stun:stun2.l.google.com:19302' },
-            { urls: 'stun:stun3.l.google.com:19302' },
-            { urls: 'stun:stun4.l.google.com:19302' }
+            {
+                urls: 'turn:numb.viagenie.ca',
+                username: 'webrtc@live.com',
+                credential: 'muazkh'
+            },
+            {
+                urls: 'turn:192.158.29.39:3478?transport=udp',
+                username: 'YzYNCouZM1mhqhmseWk6',
+                credential: 'YzYNCouZM1mhqhmseWk6'
+            },
+            {
+                urls: 'turn:192.158.29.39:3478?transport=tcp',
+                username: 'YzYNCouZM1mhqhmseWk6',
+                credential: 'YzYNCouZM1mhqhmseWk6'
+            }
         ],
         iceCandidatePoolSize: 10,
         bundlePolicy: 'max-bundle',
-        iceTransportPolicy: 'all',
-    };
-
-    configuration.onicecandidate = event => {
-
-        if (event.candidate) {
-            console.log('New ICE candidate:', event.candidate);
-        }
-        signalingChannel.send(JSON.stringify({ 'new-ice-candidate': event.candidate }));
+        iceTransportPolicy: 'all'
     };
 
     useEffect(() => {
