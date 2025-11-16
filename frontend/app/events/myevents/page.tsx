@@ -18,12 +18,13 @@ export default function MyEvents() {
     useEffect(() => {
         const getTuteeEvents = async () => {
             try {
-                const res = await fetch("http://localhost:6969/events/tutee", {
+                const res = await fetch("https://api.tutorl.ink/events/tutee", {
                     headers: { Authorization: `Bearer ${token}` },
                 });
                 if (!res.ok) throw new Error("Failed to fetch tutee events");
                 const data = await res.json();
                 const tuteeEvents = data.events;
+                console.log(tuteeEvents)
 
                 const pendingTuteeEvents = tuteeEvents.filter(
                     (e) =>
@@ -49,7 +50,7 @@ export default function MyEvents() {
 
         const getTutorEvents = async () => {
             try {
-                const res = await fetch("http://localhost:6969/events/tutor", {
+                const res = await fetch("https://api.tutorl.ink/events/tutor", {
                     headers: { Authorization: `Bearer ${token}` },
                 });
                 if (!res.ok) throw new Error("Failed to fetch tutor events");
@@ -65,7 +66,7 @@ export default function MyEvents() {
                 const acceptedTutorEvents = tutorEvents.filter(
                     (event) => event.userid_tutor === user.userid,
                 );
-
+                console.log(tutorEvents)
                 setPendingTutorEvents(pendingTutorEvents);
                 setAcceptedTutorEvents(acceptedTutorEvents);
             } catch (err: any) {
