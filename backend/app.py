@@ -274,7 +274,7 @@ def get_event_offer(event_id):
 
 
 # Accept a tutor for an event
-@app.route('/event/<int:event_id>/accept', methods=['POST'])
+@app.route('/event/<int:event_id>/accept', methods=['POST', 'OPTIONS'])
 @jwt_required()
 def accept_event_offer(event_id):
     accepted_tutor = accept_tutor(
