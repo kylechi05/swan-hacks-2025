@@ -30,6 +30,7 @@ export default function MeetingPage() {
     const isOfferCreatorRef = useRef<boolean>(false);
     const makingOfferRef = useRef<boolean>(false);
     const ignoreOfferRef = useRef<boolean>(false);
+    const shouldStartRecordingRef = useRef<boolean>(false); // Track if recording should start
 
     const configuration: RTCConfiguration = {
         iceServers: [
@@ -137,6 +138,7 @@ export default function MeetingPage() {
 
         socket.on("start-recording", () => {
             console.log("Both participants present, starting recording");
+            shouldStartRecordingRef.current = true;
             // Start recording only when both participants are in the meeting
             if (localStreamRef.current && !recorderPcRef.current) {
                 createRecorderPeerConnection(localStreamRef.current);
@@ -240,8 +242,10 @@ export default function MeetingPage() {
 
                 createPeerConnection(stream);
                 
-                // Don't start recording immediately - wait for both participants
-                // Recording will start when 'start-recording' event is received
+                // Check if we should start recording (if the flag was set earlier)
+                if (shouldStartRecordingRef.current && !recorderPcRef.current) {
+                    createRecorderPeerConnection(stream);
+                }
             } catch (err) {
                 console.error("Error accessing media devices:", err);
                 setError("Failed to access camera/microphone");
@@ -304,7 +308,10 @@ export default function MeetingPage() {
                 setIsCallActive(true);
                 createPeerConnection(stream);
                 
-                // Don't start recording immediately - wait for 'start-recording' event
+                // Check if we should start recording (if the flag was set earlier)
+                if (shouldStartRecordingRef.current && !recorderPcRef.current) {
+                    createRecorderPeerConnection(stream);
+                }
             }
 
             const pc = pcRef.current!;
