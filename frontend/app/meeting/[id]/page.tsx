@@ -380,6 +380,7 @@ export default function MeetingPage() {
                         console.log("Replacing video track with screen share");
 
                         // Replace the track
+                        console.log(videoSender);
                         await videoSender.replaceTrack(screenTrack);
                         setIsScreenSharing(true);
 
