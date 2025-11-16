@@ -179,17 +179,28 @@ export default function MeetingPage() {
                 }
             }
 
-            await pc2Ref.current.setRemoteDescription(
-                new RTCSessionDescription(data),
-            );
-            const answer = await pc2Ref.current.createAnswer();
-            await pc2Ref.current.setLocalDescription(answer);
+            // Check state before setting remote description
+            if (
+                pc2Ref.current.signalingState === "stable" ||
+                pc2Ref.current.signalingState === "have-remote-offer"
+            ) {
+                await pc2Ref.current.setRemoteDescription(
+                    new RTCSessionDescription(data),
+                );
+                const answer = await pc2Ref.current.createAnswer();
+                await pc2Ref.current.setLocalDescription(answer);
 
-            if (socketRef.current) {
-                socketRef.current.emit("answer", {
-                    sdp: pc2Ref.current.localDescription!.sdp,
-                    type: pc2Ref.current.localDescription!.type,
-                });
+                if (socketRef.current) {
+                    socketRef.current.emit("answer", {
+                        sdp: pc2Ref.current.localDescription!.sdp,
+                        type: pc2Ref.current.localDescription!.type,
+                    });
+                }
+                console.log("Successfully handled offer and sent answer");
+            } else {
+                console.warn(
+                    `Cannot set remote offer in state ${pc2Ref.current.signalingState}`,
+                );
             }
         } catch (error) {
             console.error("Error handling offer:", error);
@@ -200,12 +211,21 @@ export default function MeetingPage() {
     const handleAnswer = async (data: { sdp: string; type: RTCSdpType }) => {
         try {
             if (pc1Ref.current) {
-                await pc1Ref.current.setRemoteDescription(
-                    new RTCSessionDescription(data),
-                );
+                // Check if we're in a valid state to receive an answer
+                if (pc1Ref.current.signalingState === "have-local-offer") {
+                    await pc1Ref.current.setRemoteDescription(
+                        new RTCSessionDescription(data),
+                    );
+                    console.log("Successfully set remote answer");
+                } else {
+                    console.warn(
+                        `Cannot set remote answer in state ${pc1Ref.current.signalingState}`,
+                    );
+                }
             }
         } catch (error) {
             console.error("Error handling answer:", error);
+            setError("Failed to establish connection");
         }
     };
 
