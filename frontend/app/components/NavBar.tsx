@@ -13,16 +13,10 @@ export function NavBar() {
     }, []);
 
     return (
-<<<<<<< HEAD
         <div className="flex h-16 text-sm  flex-row items-center gap-20 border-b border-(--primary-border-color) bg-(--background)/80 px-32 text-(--light-gray) transition-all">
             <Link href="/" className="text-xl font-bold">
                 <span className="text-white">Tutor</span>
                 <span className="text-green-600">Link</span>
-=======
-        <div className="sticky top-0 flex h-16 flex-row items-center gap-20 border-b border-(--primary-border-color) bg-(--background)/85 px-32 text-sm text-(--light-gray) backdrop-blur-md transition-all">
-            <Link href="/" className="text-xl text-(--off-white)">
-                TutorLink
->>>>>>> d4363290b27cc99ca2010d755d1440f7b5bc1786
             </Link>
             <Link href="/events" className="hover:text-(--off-white)">
                 Events

@@ -110,11 +110,7 @@ export function SignUp() {
 
                 <button
                     type="submit"
-<<<<<<< HEAD
                     className="transition-all cursor-pointer rounded hover:bg-blue-900 bg-blue-900 px-4 py-2 text-white hover:scale-105"
-=======
-                    className="cursor-pointer rounded-lg bg-blue-500 px-4 py-2 text-white transition-all hover:scale-105 hover:bg-blue-600"
->>>>>>> d4363290b27cc99ca2010d755d1440f7b5bc1786
                 >
                     Create Account
                 </button>

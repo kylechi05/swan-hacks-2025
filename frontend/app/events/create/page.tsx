@@ -157,11 +157,7 @@ export default function CreateEvent() {
                     {error && <p className="text-sm font-medium text-red-500">{error}</p>}
                     <button
                         type="submit"
-<<<<<<< HEAD
                         className="cursor-pointer rounded-lg bg-green-600 px-4 py-2 text-white transition-all hover:scale-105 hover:bg-green-500"
-=======
-                        className="rounded-lg bg-blue-600 px-4 py-2 text-white transition-all hover:scale-105 hover:bg-blue-500"
->>>>>>> d4363290b27cc99ca2010d755d1440f7b5bc1786
                     >
                         Create Event
                     </button>
