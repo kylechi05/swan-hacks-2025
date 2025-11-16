@@ -29,30 +29,30 @@ export default function MeetingPage() {
 
     const configuration: RTCConfiguration = {
         iceServers: [
-            {
-                urls: "stun:stun.relay.metered.ca:80",
-            },
-            {
-                urls: "turn:standard.relay.metered.ca:80",
-                username: "21681ef33e1175e2ba2aae3c",
-                credential: "LWN5QDGpz7QJtKTW",
-            },
-            {
-                urls: "turn:standard.relay.metered.ca:80?transport=tcp",
-                username: "21681ef33e1175e2ba2aae3c",
-                credential: "LWN5QDGpz7QJtKTW",
-            },
-            {
-                urls: "turn:standard.relay.metered.ca:443",
-                username: "21681ef33e1175e2ba2aae3c",
-                credential: "LWN5QDGpz7QJtKTW",
-            },
-            {
-                urls: "turns:standard.relay.metered.ca:443?transport=tcp",
-                username: "21681ef33e1175e2ba2aae3c",
-                credential: "LWN5QDGpz7QJtKTW",
-            },
-        ],
+      {
+        urls: "stun:stun.relay.metered.ca:80",
+      },
+      {
+        urls: "turn:standard.relay.metered.ca:80",
+        username: "21681ef33e1175e2ba2aae3c",
+        credential: "LWN5QDGpz7QJtKTW",
+      },
+      {
+        urls: "turn:standard.relay.metered.ca:80?transport=tcp",
+        username: "21681ef33e1175e2ba2aae3c",
+        credential: "LWN5QDGpz7QJtKTW",
+      },
+      {
+        urls: "turn:standard.relay.metered.ca:443",
+        username: "21681ef33e1175e2ba2aae3c",
+        credential: "LWN5QDGpz7QJtKTW",
+      },
+      {
+        urls: "turns:standard.relay.metered.ca:443?transport=tcp",
+        username: "21681ef33e1175e2ba2aae3c",
+        credential: "LWN5QDGpz7QJtKTW",
+      },
+  ],
         iceCandidatePoolSize: 10,
         bundlePolicy: "max-bundle",
         iceTransportPolicy: "all",
@@ -108,11 +108,13 @@ export default function MeetingPage() {
 
         socket.on(
             "ice-candidate",
-            async (data: {
-                candidate: string;
-                sdpMLineIndex: number;
-                sdpMid: string;
-            }) => {
+            async (
+                data: {
+                    candidate: string;
+                    sdpMLineIndex: number;
+                    sdpMid: string;
+                },
+            ) => {
                 console.log("Received ICE candidate");
                 await handleIceCandidate(data);
             },
@@ -120,14 +122,14 @@ export default function MeetingPage() {
 
         return () => {
             if (localStreamRef.current) {
-                localStreamRef.current
-                    .getTracks()
-                    .forEach((track) => track.stop());
+                localStreamRef.current.getTracks().forEach((track) =>
+                    track.stop()
+                );
             }
             if (screenStreamRef.current) {
-                screenStreamRef.current
-                    .getTracks()
-                    .forEach((track) => track.stop());
+                screenStreamRef.current.getTracks().forEach((track) =>
+                    track.stop()
+                );
             }
             if (pc1Ref.current) pc1Ref.current.close();
             if (pc2Ref.current) pc2Ref.current.close();
@@ -199,13 +201,7 @@ export default function MeetingPage() {
 
     // Effect to create peer connection and send offer
     useEffect(() => {
-        if (
-            !isCallActive ||
-            !localStreamRef.current ||
-            !isOfferCreatorRef.current ||
-            pc1Ref.current
-        )
-            return;
+        if (!isCallActive || !localStreamRef.current || !isOfferCreatorRef.current || pc1Ref.current) return;
 
         const createPeerConnection = async () => {
             try {
@@ -445,11 +441,9 @@ export default function MeetingPage() {
         }
     };
 
-    const handleIceCandidate = async (data: {
-        candidate: string;
-        sdpMLineIndex: number;
-        sdpMid: string;
-    }) => {
+    const handleIceCandidate = async (
+        data: { candidate: string; sdpMLineIndex: number; sdpMid: string },
+    ) => {
         try {
             const candidate = new RTCIceCandidate(data);
 
@@ -498,8 +492,8 @@ export default function MeetingPage() {
                 const pc = pc1Ref.current || pc2Ref.current;
                 if (pc) {
                     const senders = pc.getSenders();
-                    const videoSender = senders.find(
-                        (sender) => sender.track?.kind === "video",
+                    const videoSender = senders.find((sender) =>
+                        sender.track?.kind === "video"
                     );
                     if (videoSender && localStreamRef.current) {
                         console.log("[Screen Share] Current video sender:", {
@@ -512,9 +506,6 @@ export default function MeetingPage() {
                         });
                         console.log("[Screen Share] Replacing video track with screen share");
 
-                        // Store the original camera track before replacing
-                        const originalCameraTrack = videoSender.track;
-                        
                         // Replace the track
                         await videoSender.replaceTrack(screenTrack);
                         console.log("[Screen Share] Track replaced. New track:", {
@@ -523,24 +514,8 @@ export default function MeetingPage() {
                             label: screenTrack.label
                         });
 
-                        // Verify the track was actually replaced
-                        const currentTrack = videoSender.track;
-                        console.log("[Screen Share] Current track in sender after replace:", {
-                            id: currentTrack?.id,
-                            label: currentTrack?.label,
-                            enabled: currentTrack?.enabled,
-                            readyState: currentTrack?.readyState
-                        });
-
-                        // For PC1, manually trigger renegotiation since replaceTrack doesn't always fire negotiationneeded
-                        if (pc1Ref.current) {
-                            console.log("[Screen Share] PC1 detected - manually triggering renegotiation");
-                            // Small delay to ensure track is fully replaced in the connection
-                            await new Promise(resolve => setTimeout(resolve, 100));
-                            await runOfferAnswer(pc1Ref.current);
-                        } else {
-                            console.log("[Screen Share] PC2 detected - negotiationneeded should handle on remote peer");
-                        }
+                        // The negotiationneeded event handler will automatically trigger renegotiation
+                        console.log("[Screen Share] Track replaced, negotiationneeded will handle renegotiation");
                         
                         setIsScreenSharing(true);
 
@@ -566,19 +541,11 @@ export default function MeetingPage() {
                                 });
                                 await videoSender.replaceTrack(cameraTrack);
 
-                                // For PC1, manually trigger renegotiation when switching back
-                                if (pc1Ref.current) {
-                                    console.log("[Screen Share] PC1 detected - manually triggering renegotiation to switch back to camera");
-                                    // Small delay to ensure track is fully replaced
-                                    await new Promise(resolve => setTimeout(resolve, 100));
-                                    await runOfferAnswer(pc1Ref.current);
-                                } else {
-                                    console.log("[Screen Share] PC2 detected - negotiationneeded should handle on remote peer");
-                                }
+                                // The negotiationneeded event handler will automatically trigger renegotiation
+                                console.log("[Screen Share] Camera track replaced, negotiationneeded will handle renegotiation");
 
                                 if (
-                                    localVideoRef.current &&
-                                    localStreamRef.current
+                                    localVideoRef.current && localStreamRef.current
                                 ) {
                                     localVideoRef.current.srcObject =
                                         localStreamRef.current;
@@ -590,16 +557,12 @@ export default function MeetingPage() {
 
                             // Stop screen stream tracks
                             if (screenStreamRef.current) {
-                                screenStreamRef.current
-                                    .getTracks()
-                                    .forEach((track) => track.stop());
+                                screenStreamRef.current.getTracks().forEach(track => track.stop());
                                 screenStreamRef.current = null;
                             }
                         };
                     } else {
-                        console.error(
-                            "Video sender not found or no local stream",
-                        );
+                        console.error("Video sender not found or no local stream");
                         setError("Failed to find video track");
                         setShouldShareScreen(false);
                     }
@@ -679,9 +642,9 @@ export default function MeetingPage() {
             localStreamRef.current = null;
         }
         if (screenStreamRef.current) {
-            screenStreamRef.current
-                .getTracks()
-                .forEach((track) => track.stop());
+            screenStreamRef.current.getTracks().forEach((track) =>
+                track.stop()
+            );
             screenStreamRef.current = null;
         }
 
@@ -694,9 +657,45 @@ export default function MeetingPage() {
     };
 
     return (
-        <div className="relative flex h-[calc(100vh-64px)] w-full flex-row items-center bg-(--background) text-(--off-white)">
+        <div className="min-h-screen bg-(--background) text-(--off-white)">
+            {/* Header */}
+            <div className="border-b border-(--primary-border-color) bg-zinc-900 px-8 py-4">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h1 className="text-2xl font-semibold">
+                            Tutoring Session
+                        </h1>
+                        <p className="text-sm text-(--light-gray)">
+                            Meeting ID: {meetingId}
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2">
+                            <div
+                                className={`h-2 w-2 rounded-full ${
+                                    isConnected ? "bg-green-500" : "bg-red-500"
+                                }`}
+                            />
+                            <span className="text-sm text-(--light-gray)">
+                                {isConnected ? "Connected" : "Disconnected"}
+                            </span>
+                        </div>
+                        <div className="text-sm text-(--light-gray)">
+                            Participants: {memberCount}/2
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Error Message */}
+            {error && (
+                <div className="mx-8 mt-4 rounded-lg border border-red-500 bg-red-500/10 px-4 py-3 text-red-500">
+                    {error}
+                </div>
+            )}
+
             {/* Video Container */}
-            <div className="relative z-0 mx-8 my-6 h-[80vh] w-full overflow-hidden rounded-xl bg-black">
+            <div className="relative mx-8 my-6 h-[80vh] overflow-hidden rounded-xl bg-black">
                 {/* Remote Video (main view) */}
                 <video
                     ref={remoteVideoRef}
@@ -711,7 +710,7 @@ export default function MeetingPage() {
                     autoPlay
                     playsInline
                     muted
-                    className="absolute right-6 bottom-6 h-40 w-52 rounded-lg border-2 border-white object-cover shadow-lg"
+                    className="absolute bottom-6 right-6 h-40 w-52 rounded-lg border-2 border-white object-cover shadow-lg"
                 />
 
                 {/* Waiting message */}
@@ -729,64 +728,33 @@ export default function MeetingPage() {
                         </div>
                     </div>
                 )}
-                {/* Controls */}
-                <div className="absolute bottom-0 z-10 flex w-full justify-center gap-4 px-8 pb-8">
-                    <button
-                        onClick={handleStart}
-                        disabled={isCallActive}
-                        className="cursor-pointer rounded-lg bg-green-600 px-6 py-1.5 font-semibold text-white transition-all hover:scale-105 hover:bg-green-500 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100 disabled:hover:bg-green-600"
-                    >
-                        {isCallActive ? "Call Active" : "Start Call"}
-                    </button>
-
-                    <button
-                        onClick={handleShareScreen}
-                        disabled={!isCallActive}
-                        className="cursor-pointer rounded-lg border-2 border-blue-600 bg-blue-600/20 px-6 py-1.5 font-semibold text-white transition-all hover:scale-105 hover:border-blue-500 hover:bg-blue-600/30 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
-                    >
-                        {isScreenSharing ? "Sharing Screen" : "Share Screen"}
-                    </button>
-
-                    <button
-                        onClick={handleHangup}
-                        disabled={!isCallActive}
-                        className="cursor-pointer rounded-lg border-2 border-red-600 bg-red-600/20 px-6 py-1.5 font-semibold text-white transition-all hover:scale-105 hover:border-red-500 hover:bg-red-600/30 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
-                    >
-                        Hang Up
-                    </button>
-                </div>
             </div>
-            {/* Header */}
-            <div className="flex h-full w-1/4 shrink-0 flex-col border-b border-(--primary-border-color) bg-zinc-900 px-8 py-4">
-                <div className="flex flex-col items-start justify-between">
-                    <h1 className="text-2xl font-semibold">Tutoring Session</h1>
-                    <div className="flex w-full flex-row justify-between">
-                        <div>
-                            <p className="text-sm text-(--light-gray)">
-                                Meeting ID: {meetingId}
-                            </p>
-                            <p className="text-sm text-(--light-gray)">
-                                Participants: {memberCount}/2
-                            </p>
-                        </div>
-                        <div className="flex flex-row items-center gap-2">
-                            <div
-                                className={`h-2 w-2 rounded-full ${
-                                    isConnected ? "bg-green-500" : "bg-red-500"
-                                }`}
-                            />
-                            <span className="text-sm text-(--light-gray)">
-                                {isConnected ? "Connected" : "Disconnected"}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-                {/* Error Message */}
-                {error && (
-                    <div className="mx-8 mt-4 rounded-lg border border-red-500 bg-red-500/10 px-4 py-3 text-red-500">
-                        {error}
-                    </div>
-                )}
+
+            {/* Controls */}
+            <div className="flex justify-center gap-4 px-8 pb-8">
+                <button
+                    onClick={handleStart}
+                    disabled={isCallActive}
+                    className="rounded-lg bg-green-600 px-6 py-3 font-semibold text-white transition-all hover:scale-105 hover:bg-green-500 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100 disabled:hover:bg-green-600"
+                >
+                    {isCallActive ? "Call Active" : "Start Call"}
+                </button>
+
+                <button
+                    onClick={handleShareScreen}
+                    disabled={!isCallActive}
+                    className="rounded-lg border-2 border-blue-600 bg-blue-600/20 px-6 py-3 font-semibold text-white transition-all hover:scale-105 hover:border-blue-500 hover:bg-blue-600/30 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
+                >
+                    {isScreenSharing ? "Sharing Screen" : "Share Screen"}
+                </button>
+
+                <button
+                    onClick={handleHangup}
+                    disabled={!isCallActive}
+                    className="rounded-lg border-2 border-red-600 bg-red-600/20 px-6 py-3 font-semibold text-white transition-all hover:scale-105 hover:border-red-500 hover:bg-red-600/30 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
+                >
+                    Hang Up
+                </button>
             </div>
         </div>
     );
