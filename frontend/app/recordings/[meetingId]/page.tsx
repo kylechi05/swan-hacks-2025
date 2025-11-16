@@ -58,6 +58,7 @@ export default function SyncedRecordingPage() {
             sentence_count: 0,
             sentences: [],
         });
+    const [aiSummary, setAiSummary] = useState("");
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isPlaying, setIsPlaying] = useState(false);
@@ -103,13 +104,24 @@ export default function SyncedRecordingPage() {
                     if (stitchedTranscriptResponse.ok) {
                         const stitchedTranscriptData =
                             await stitchedTranscriptResponse.json();
-                        console.log(stitchedTranscriptData);
                         setStitchedTranscripts(stitchedTranscriptData);
                     }
                 } catch (err) {
                     console.log("No transcripts available yet");
                 }
 
+                // also fetch ai summary
+                try {
+                    const aiSummary = await fetch(
+                        `https://api.tutorl.ink/api/transcripts/meeting/summary/${meetingId}`,
+                    );
+                    if (aiSummary.ok) {
+                        const summary = await aiSummary.json();
+                        setAiSummary(summary.summary);
+                    }
+                } catch (err) {
+                    console.log("No transcripts available yet");
+                }
                 setLoading(false);
             } catch (err) {
                 setError(err instanceof Error ? err.message : "Unknown error");
@@ -526,6 +538,21 @@ export default function SyncedRecordingPage() {
                     ))}
                 </div>
 
+                {/* AI Summary Section */}
+                {aiSummary && (
+                    <div className="mt-6 rounded-xl bg-gray-800 p-6 shadow-xl">
+                        <div className="mb-4 flex items-center justify-between">
+                            <h3 className="text-2xl font-bold text-green-400">
+                                🤖 AI Meeting Summary
+                            </h3>
+                        </div>
+
+                        <p className="leading-relaxed text-(--light-gray)">
+                            {aiSummary}
+                        </p>
+                    </div>
+                )}
+
                 {/* Stitched Transcripts Section */}
                 {stitchedTranscripts.sentences.length > 0 && (
                     <div className="mt-6 rounded-xl bg-gray-800 p-6 shadow-xl">
@@ -637,7 +664,7 @@ export default function SyncedRecordingPage() {
                         )}
                     </div>
                 </div>
-                <div className="pb-24"/>
+                <div className="pb-24" />
             </div>
         </div>
     );
