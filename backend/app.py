@@ -187,7 +187,6 @@ def handle_ice_candidate(data):
         
     except Exception as e:
         logger.error(f"Error in handle_ice_candidate: {e}", exc_info=True)
-
 @socketio.on('disconnect')
 def handle_disconnect():
     """Handle user disconnecting from meeting and chat"""
@@ -199,20 +198,20 @@ def handle_disconnect():
         if room_id:
             logger.info(f"User {sid} disconnecting from room {room_id}")
             
-            # Stop ALL recordings for this meeting when anyone leaves
+            # --- START OF FIX ---
+            # Stop the recording *only* for the participant who is disconnecting.
+            # We assume the 'sid' is used as the 'participant_id' when 
+            # the recording was started.
+            try:
+                logger.info(f"Stopping recording for participant {sid} in room {room_id}")
+                # Call stop_recording, not stop_meeting_recording
+                run_async(meeting_recorder.stop_recording(room_id, sid))
+            except Exception as e:
+                logger.error(f"Error stopping participant recording: {e}")
+            # --- END OF FIX ---
+            
+            # Now, handle room membership and cleanup
             if room_id in meeting_rooms:
-                member_count = len(meeting_rooms[room_id]['members'])
-                
-                # If there were 2 people and someone is leaving, stop all recordings
-                if member_count == 2:
-                    logger.info(f"Participant leaving room {room_id}, stopping all recordings")
-                    try:
-                        run_async(meeting_recorder.stop_meeting_recording(room_id))
-                        # Notify remaining participant to stop their recording too
-                        emit('stop-recording', room=room_id)
-                    except Exception as e:
-                        logger.error(f"Error stopping meeting recording: {e}")
-                
                 # Remove user from room
                 if sid in meeting_rooms[room_id]['members']:
                     meeting_rooms[room_id]['members'].remove(sid)
@@ -275,7 +274,6 @@ def handle_disconnect():
         
     except Exception as e:
         logger.error(f"Error in handle_disconnect: {e}", exc_info=True)
-
 
 @socketio.on('recorder-offer')
 def handle_recorder_offer(data):
