@@ -129,13 +129,13 @@ class MediaRecorderSession:
     async def add_ice_candidate(self, candidate: dict):
         """Add ICE candidate from client."""
         try:
-            from aiortc import RTCIceCandidate
-            ice_candidate = RTCIceCandidate(
-                sdpMid=candidate.get("sdpMid"),
-                sdpMLineIndex=candidate.get("sdpMLineIndex"),
-                candidate=candidate.get("candidate")
-            )
-            await self.pc.addIceCandidate(ice_candidate)
+            from aiortc.sdp import candidate_from_sdp
+            candidate_str = candidate.get("candidate")
+            if candidate_str and self.pc:
+                ice_candidate = candidate_from_sdp(candidate_str)
+                ice_candidate.sdpMid = candidate.get("sdpMid")
+                ice_candidate.sdpMLineIndex = candidate.get("sdpMLineIndex")
+                await self.pc.addIceCandidate(ice_candidate)
         except Exception as e:
             logger.error(f"Error adding ICE candidate: {e}", exc_info=True)
     
