@@ -187,11 +187,22 @@ class MediaRecorderSession:
                 self.is_recording = False
                 logger.info(f"Recording saved to {output_file}")
                 
-                # Trigger transcription in background (non-blocking)
-                asyncio.create_task(self._transcribe_recording(output_file, meeting_id, participant_id))
+                # Check if file was actually created and has content
+                if output_file and os.path.exists(output_file) and os.path.getsize(output_file) > 0:
+                    # Trigger transcription in background (non-blocking)
+                    asyncio.create_task(self._transcribe_recording(output_file, meeting_id, participant_id))
+                else:
+                    logger.warning(f"Recording file is empty or doesn't exist: {output_file}")
                 
             except Exception as e:
                 logger.error(f"Error stopping recorder: {e}", exc_info=True)
+                # Try to delete corrupted file
+                try:
+                    if output_file and os.path.exists(output_file):
+                        os.remove(output_file)
+                        logger.info(f"Removed corrupted recording file: {output_file}")
+                except Exception as cleanup_error:
+                    logger.error(f"Error cleaning up corrupted file: {cleanup_error}")
         
         if self.pc:
             try:
