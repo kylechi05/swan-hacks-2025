@@ -74,7 +74,7 @@ def list_tutor_events(userid_tutor):
                         'category': event.category,
                         'description': event.description,
                         'possible_tutors': possible_tutors_list,
-                        'userid_tutor': event.userid_tutor,
+                        'userid_tutor': json.loads(event.userid_tutor) if event.userid_tutor else None,
                         'is_accepted': event.is_accepted,
                         'available_start_time': event.available_start_time,
                         'available_end_time': event.available_end_time
