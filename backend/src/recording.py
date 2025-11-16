@@ -49,16 +49,32 @@ class MediaRecorderSession:
         
         @self.pc.on("track")
         async def on_track(track):
-            logger.info(f"Recording track {track.kind} for participant {self.participant_id}")
+            logger.info(f"[Recording] Received track {track.kind} for participant {self.participant_id}")
+            logger.info(f"[Recording] Track ID: {track.id}")
             
             if track.kind == "video":
                 self.video_track = track
+                logger.info(f"[Recording] Set video track for {self.participant_id}")
             elif track.kind == "audio":
                 self.audio_track = track
+                logger.info(f"[Recording] Set audio track for {self.participant_id}")
             
-            # Start recording when we have at least one track
-            if not self.is_recording and (self.video_track or self.audio_track):
-                await self._start_recording()
+            # Wait a bit for other tracks to arrive before starting recording
+            # This prevents starting with only audio when video is coming
+            if not self.is_recording:
+                logger.info(f"[Recording] Track received, waiting 100ms for other tracks...")
+                await asyncio.sleep(0.1)
+                
+                # Start recording if we have any tracks and not already recording
+                if not self.is_recording and (self.video_track or self.audio_track):
+                    logger.info(f"[Recording] Starting recording with video={bool(self.video_track)}, audio={bool(self.audio_track)}")
+                    await self._start_recording()
+            else:
+                # Recording already started, add this track if possible
+                logger.info(f"[Recording] Recording already started, track arrived late")
+                # MediaRecorder can't add tracks after start, so we log a warning
+                if track.kind == "video" and not self.video_track:
+                    logger.warning(f"[Recording] Video track arrived after recording started!")
             
             @track.on("ended")
             async def on_ended():
@@ -87,24 +103,35 @@ class MediaRecorderSession:
             return
         
         try:
-            # Create recorder with the output file
-            self.recorder = MediaRecorder(self.output_file)
+            logger.info(f"[Recording] _start_recording called for {self.participant_id}")
+            logger.info(f"[Recording] video_track={self.video_track}, audio_track={self.audio_track}")
+            
+            # Create recorder with the output file and format options
+            # Use mp4 container with h264 video codec
+            self.recorder = MediaRecorder(
+                self.output_file,
+                format="mp4"
+            )
             
             # Add tracks to recorder
             if self.video_track:
                 self.recorder.addTrack(self.video_track)
-                logger.info(f"Added video track to recorder for {self.participant_id}")
+                logger.info(f"[Recording] Added video track to recorder for {self.participant_id}")
+            else:
+                logger.warning(f"[Recording] No video track available for {self.participant_id}")
             
             if self.audio_track:
                 self.recorder.addTrack(self.audio_track)
-                logger.info(f"Added audio track to recorder for {self.participant_id}")
+                logger.info(f"[Recording] Added audio track to recorder for {self.participant_id}")
+            else:
+                logger.warning(f"[Recording] No audio track available for {self.participant_id}")
             
             await self.recorder.start()
             self.is_recording = True
-            logger.info(f"Started recording to {self.output_file}")
+            logger.info(f"[Recording] Started recording to {self.output_file}")
             
         except Exception as e:
-            logger.error(f"Error starting recorder: {e}", exc_info=True)
+            logger.error(f"[Recording] Error starting recorder: {e}", exc_info=True)
     
     async def handle_offer(self, offer: dict) -> dict:
         """
@@ -117,14 +144,22 @@ class MediaRecorderSession:
             Dictionary with answer SDP
         """
         try:
-            # Set remote description
-            await self.pc.setRemoteDescription(
-                RTCSessionDescription(sdp=offer["sdp"], type=offer["type"])
-            )
+            # Set remote description from client's offer
+            offer_desc = RTCSessionDescription(sdp=offer["sdp"], type=offer["type"])
+            await self.pc.setRemoteDescription(offer_desc)
+            
+            logger.info(f"Set remote description for {self.participant_id}")
+            logger.info(f"Remote transceivers count: {len(self.pc.getTransceivers())}")
+            
+            # Log what tracks we're expecting
+            for transceiver in self.pc.getTransceivers():
+                logger.info(f"Transceiver: {transceiver.kind}, direction: {transceiver.direction}")
             
             # Create answer
             answer = await self.pc.createAnswer()
             await self.pc.setLocalDescription(answer)
+            
+            logger.info(f"Created answer with {len(self.pc.getTransceivers())} transceivers")
             
             return {
                 "sdp": self.pc.localDescription.sdp,
