@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "../authContext";
 
 interface Recording {
     filename: string;
@@ -19,29 +20,67 @@ interface MeetingGroup {
 }
 
 export default function RecordingsListPage() {
+    const { user, token } = useAuth();
     const router = useRouter();
     const [meetings, setMeetings] = useState<MeetingGroup[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        const fetchRecordings = async () => {
+        const fetchData = async () => {
             try {
-                const response = await fetch("https://api.tutorl.ink/api/recordings");
-                if (!response.ok) {
+                const eventIDs: number[] = [];
+
+                const tuteeRes = await fetch(
+                    "https://api.tutorl.ink/events/tutee",
+                    {
+                        headers: { Authorization: `Bearer ${token}` },
+                    },
+                );
+                if (!tuteeRes.ok)
+                    throw new Error("Failed to fetch tutee events");
+                const tuteeData = await tuteeRes.json();
+                tuteeData.events.forEach((e: any) => eventIDs.push(e.eventid));
+
+                const tutorRes = await fetch(
+                    "https://api.tutorl.ink/events/tutor",
+                    {
+                        headers: { Authorization: `Bearer ${token}` },
+                    },
+                );
+                if (!tutorRes.ok)
+                    throw new Error("Failed to fetch tutor events");
+                const tutorData = await tutorRes.json();
+                tutorData.events.forEach((e: any) => {
+                    if (!eventIDs.includes(e.eventid)) {
+                        eventIDs.push(e.eventid);
+                    }
+                });
+
+                const recordingsRes = await fetch(
+                    "https://api.tutorl.ink/api/recordings",
+                );
+                if (!recordingsRes.ok)
                     throw new Error("Failed to fetch recordings");
-                }
-                const data = await response.json();
-                setMeetings(data);
+                const recordingsData = await recordingsRes.json();
+
+                const filteredMeetings = recordingsData.filter((meeting: any) =>
+                    true
+                    //eventIDs.includes(Number(meeting.meeting_id)),
+                );
+
+                setMeetings(filteredMeetings);
             } catch (err) {
-                console.error("Error fetching recordings:", err);
-                setError(err instanceof Error ? err.message : "Failed to load recordings");
+                console.error("Error fetching data:", err);
+                setError(
+                    err instanceof Error ? err.message : "Failed to load data",
+                );
             } finally {
                 setLoading(false);
             }
         };
 
-        fetchRecordings();
+        fetchData();
     }, []);
 
     const viewSyncedRecording = (meetingId: string) => {
@@ -102,10 +141,12 @@ export default function RecordingsListPage() {
                             >
                                 <div className="border-b-2 border-green-600 bg-gray-700 p-5">
                                     <h3 className="text-xl font-bold text-green-500">
-                                        Meeting #{meeting.meeting_id.substring(0, 8)}
+                                        Meeting #
+                                        {meeting.meeting_id.substring(0, 8)}
                                     </h3>
                                     <p className="text-sm text-(--light-gray)">
-                                        {meeting.recordings.length} Participant(s)
+                                        {meeting.recordings.length}{" "}
+                                        Participant(s)
                                     </p>
                                 </div>
 
@@ -117,7 +158,7 @@ export default function RecordingsListPage() {
                                             </span>
                                             <span className="font-semibold">
                                                 {new Date(
-                                                    meeting.created
+                                                    meeting.created,
                                                 ).toLocaleDateString()}
                                             </span>
                                         </div>
@@ -126,16 +167,21 @@ export default function RecordingsListPage() {
                                                 Duration:
                                             </span>
                                             <span className="font-semibold">
-                                                {meeting.recordings[0].timestamp}
+                                                {
+                                                    meeting.recordings[0]
+                                                        .timestamp
+                                                }
                                             </span>
                                         </div>
                                     </div>
 
                                     <button
                                         onClick={() =>
-                                            viewSyncedRecording(meeting.meeting_id)
+                                            viewSyncedRecording(
+                                                meeting.meeting_id,
+                                            )
                                         }
-                                        className="cursor-pointer w-full rounded-lg bg-green-600 py-3 font-semibold transition hover:bg-green-500"
+                                        className="w-full cursor-pointer rounded-lg bg-green-600 py-3 font-semibold transition hover:bg-green-500"
                                     >
                                         {meeting.recordings.length > 1
                                             ? "View Synced 🎬"
@@ -148,7 +194,7 @@ export default function RecordingsListPage() {
                                                 key={rec.filename}
                                                 href={`https://api.tutorl.ink/recordings/${rec.filename}`}
                                                 download
-                                                className="flex-1 rounded-lg border-2 border-blue-600 hover:bg-blue-600 py-2 text-center text-sm font-semibold transition "
+                                                className="flex-1 rounded-lg border-2 border-blue-600 py-2 text-center text-sm font-semibold transition hover:bg-blue-600"
                                                 title={`Download Participant ${idx + 1}`}
                                             >
                                                 Download ⬇️
