@@ -59,22 +59,12 @@ class MediaRecorderSession:
                 self.audio_track = track
                 logger.info(f"[Recording] Set audio track for {self.participant_id}")
             
-            # Wait a bit for other tracks to arrive before starting recording
-            # This prevents starting with only audio when video is coming
-            if not self.is_recording:
-                logger.info(f"[Recording] Track received, waiting 100ms for other tracks...")
-                await asyncio.sleep(0.1)
-                
-                # Start recording if we have any tracks and not already recording
-                if not self.is_recording and (self.video_track or self.audio_track):
-                    logger.info(f"[Recording] Starting recording with video={bool(self.video_track)}, audio={bool(self.audio_track)}")
-                    await self._start_recording()
-            else:
-                # Recording already started, add this track if possible
-                logger.info(f"[Recording] Recording already started, track arrived late")
-                # MediaRecorder can't add tracks after start, so we log a warning
-                if track.kind == "video" and not self.video_track:
-                    logger.warning(f"[Recording] Video track arrived after recording started!")
+            # Start recording immediately when we have both tracks
+            # Since we only start recording when both participants are present,
+            # both audio and video tracks should arrive together
+            if not self.is_recording and self.video_track and self.audio_track:
+                logger.info(f"[Recording] Both tracks received, starting recording")
+                await self._start_recording()
             
             @track.on("ended")
             async def on_ended():

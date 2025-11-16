@@ -92,6 +92,23 @@ export default function MeetingPage() {
             if (!localStreamRef.current) setShouldStartCall(true);
         });
 
+        socket.on("start-recording", () => {
+            console.log("Both participants present, starting recording");
+            // Start recording only when both participants are in the meeting
+            if (localStreamRef.current && !recorderPcRef.current) {
+                createRecorderPeerConnection(localStreamRef.current);
+            }
+        });
+
+        socket.on("stop-recording", () => {
+            console.log("Participant left, stopping recording");
+            // Stop recording when someone leaves
+            if (recorderPcRef.current) {
+                recorderPcRef.current.close();
+                recorderPcRef.current = null;
+            }
+        });
+
         socket.on("offer", async (data: { sdp: string; type: RTCSdpType }) => {
             console.log("Received offer from remote peer");
             await handleOffer(data);
@@ -180,8 +197,8 @@ export default function MeetingPage() {
 
                 createPeerConnection(stream);
                 
-                // Create separate peer connection for server recording
-                createRecorderPeerConnection(stream);
+                // Don't start recording immediately - wait for both participants
+                // Recording will start when 'start-recording' event is received
             } catch (err) {
                 console.error("Error accessing media devices:", err);
                 setError("Failed to access camera/microphone");
@@ -244,8 +261,7 @@ export default function MeetingPage() {
                 setIsCallActive(true);
                 createPeerConnection(stream);
                 
-                // Create separate peer connection for server recording
-                createRecorderPeerConnection(stream);
+                // Don't start recording immediately - wait for 'start-recording' event
             }
 
             const pc = pcRef.current!;

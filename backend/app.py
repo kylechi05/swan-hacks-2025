@@ -125,10 +125,12 @@ def handle_join(data):
         # Notify other members someone joined
         emit('user-joined', {'member_count': member_count}, room=eid, skip_sid=sid)
         
-        # If this is the second person, signal both peers are ready
+        # If this is the second person, signal both peers are ready and start recording
         if member_count == 2:
             emit('peer-ready', room=eid, include_self=True)
-            logger.info(f"Room {eid} now has 2 peers, signaling peer-ready")
+            # Signal to start recording now that both participants are present
+            emit('start-recording', room=eid, include_self=True)
+            logger.info(f"Room {eid} now has 2 peers, signaling peer-ready and start-recording")
             
     except Exception as e:
         logger.error(f"Error in handle_join: {e}", exc_info=True)
@@ -196,15 +198,21 @@ def handle_disconnect():
         if room_id:
             logger.info(f"User {sid} disconnecting from room {room_id}")
             
-            # Stop recording for this participant
-            try:
-                run_async(meeting_recorder.stop_recording(room_id, sid))
-                logger.info(f"Stopped recording for participant {sid}")
-            except Exception as e:
-                logger.error(f"Error stopping recording: {e}")
-            
-            # Remove user from room
+            # Stop ALL recordings for this meeting when anyone leaves
             if room_id in meeting_rooms:
+                member_count = len(meeting_rooms[room_id]['members'])
+                
+                # If there were 2 people and someone is leaving, stop all recordings
+                if member_count == 2:
+                    logger.info(f"Participant leaving room {room_id}, stopping all recordings")
+                    try:
+                        run_async(meeting_recorder.stop_meeting_recording(room_id))
+                        # Notify remaining participant to stop their recording too
+                        emit('stop-recording', room=room_id)
+                    except Exception as e:
+                        logger.error(f"Error stopping meeting recording: {e}")
+                
+                # Remove user from room
                 if sid in meeting_rooms[room_id]['members']:
                     meeting_rooms[room_id]['members'].remove(sid)
                 
@@ -213,12 +221,8 @@ def handle_disconnect():
                 # Notify remaining members
                 emit('user-left', {'member_count': member_count}, room=room_id)
                 
-                # Clean up empty rooms and stop all recordings
+                # Clean up empty rooms
                 if member_count == 0:
-                    try:
-                        run_async(meeting_recorder.stop_meeting_recording(room_id))
-                    except Exception as e:
-                        logger.error(f"Error stopping meeting recording: {e}")
                     del meeting_rooms[room_id]
                     logger.info(f"Room {room_id} is empty, removing it")
             
