@@ -1,0 +1,152 @@
+<!-- <!DOCTYPE html> -->
+<!-- <html lang="en"> -->
+<!-- <head> -->
+<!--     <meta charset="UTF-8"> -->
+<!--     <title>Flask WebSocket Chat</title> -->
+<!--     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script> -->
+<!--     <!-- <script> --> -->
+<!--     <!--     var socket = io(); --> -->
+<!--     <!--     var username = prompt("Enter your name:");  // Ask for username --> -->
+<!--     <!--     socket.emit("join", username);  // Notify server of new user --> -->
+<!--     <!----> -->
+<!--     <!--     // Listen for messages from server --> -->
+<!--     <!--     socket.on("message", function(data) { --> -->
+<!--     <!--         var messages = document.getElementById("messages"); --> -->
+<!--     <!--         messages.innerHTML += `<p>${data}</p>`; --> -->
+<!--     <!--     }); --> -->
+<!--     <!----> -->
+<!--     <!--     // Function to send messages --> -->
+<!--     <!--     function sendMessage() { --> -->
+<!--     <!--         var msgInput = document.getElementById("msg"); --> -->
+<!--     <!--         var message = msgInput.value; --> -->
+<!--     <!--         socket.send(message); --> -->
+<!--     <!--         msgInput.value = ""; --> -->
+<!--     <!--     } --> -->
+<!--     <!-- </script> --> -->
+<!-- <script src="js/main.js" async></script> -->
+<!-- </head> -->
+<!-- <body> -->
+<!--     <h2>Flask WebSocket Chat</h2> -->
+<!--     <input id="msg" type="text" placeholder="Enter your message"> -->
+<!--     <button onclick="sendMessage()">Send</button> -->
+<!--     <div id="messages"></div> -->
+<!-- </body> -->
+<!-- </html> -->
+<!DOCTYPE html>
+<!--
+ *  Copyright (c) 2015 The WebRTC project authors. All Rights Reserved.
+ *
+ *  Use of this source code is governed by a BSD-style license
+ *  that can be found in the LICENSE file in the root of the source
+ *  tree.
+-->
+<html>
+<head>
+
+    <meta charset="utf-8">
+    <meta name="description" content="WebRTC code samples">
+    <meta name="viewport" content="width=device-width, user-scalable=yes, initial-scale=1, maximum-scale=1">
+    <meta itemprop="description" content="Client-side WebRTC code samples">
+    <meta itemprop="image" content="../../../images/webrtc-icon-192x192.png">
+    <meta itemprop="name" content="WebRTC code samples">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta id="theme-color" name="theme-color" content="#ffffff">
+
+    <base target="_blank">
+
+    <title>Peer connection</title>
+
+    <link rel="icon" sizes="192x192" href="../../../images/webrtc-icon-192x192.png">
+    <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700" rel="stylesheet" type="text/css">
+    <link rel="stylesheet" href="../../../css/main.css"/>
+    <link rel="stylesheet" href="css/main.css"/>
+    
+    <style>
+        #videoContainer {
+            position: relative;
+            width: 100%;
+            height: 80vh;
+            background: #000;
+            margin: 20px 0;
+        }
+        
+        #remoteVideo {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            background: #000;
+        }
+        
+        #localVideo {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 200px;
+            height: 150px;
+            border: 2px solid #fff;
+            border-radius: 8px;
+            object-fit: cover;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            z-index: 10;
+        }
+        
+        .box {
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .box button {
+            margin: 0 10px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+    </style>
+
+</head>
+
+<body>
+
+<div id="container">
+    <h1><a href="//webrtc.github.io/samples/" title="WebRTC samples homepage">WebRTC samples</a>
+        <span>Peer connection</span></h1>
+
+    <p>This sample shows how to setup a connection between two peers using
+        <a href="https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection">RTCPeerConnection</a>.
+    </p>
+
+    <div id="videoContainer">
+        <video id="remoteVideo" playsinline autoplay></video>
+        <video id="localVideo" playsinline autoplay muted></video>
+    </div>
+
+    <div class="box">
+        <button id="startButton">Start</button>
+        <button id="shareScreenButton">Share Screen</button>
+        <button id="hangupButton">Hang Up</button>
+    </div>
+
+    <p>View the console to see logging. The <code>MediaStream</code> object <code>localStream</code>, and the <code>RTCPeerConnection</code>
+        objects <code>pc1</code> and <code>pc2</code> are in global scope, so you can inspect them in the console as
+        well.</p>
+
+    <p>For more information about RTCPeerConnection, see <a href="http://www.html5rocks.com/en/tutorials/webrtc/basics/"
+                                                            title="HTML5 Rocks article about WebRTC by Sam Dutton">Getting
+        Started With WebRTC</a>.</p>
+
+
+    <a href="https://github.com/webrtc/samples/tree/gh-pages/src/content/peerconnection/pc1"
+       title="View source for this page on GitHub" id="viewSource">View source on GitHub</a>
+
+</div>
+
+<script>
+    // Pass the eid from Flask to JavaScript
+    const eid = "{{ eid }}";
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+<script src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
+<script src="{{ url_for('static', filename='js/main.js') }}" async></script>
+
+</body>
+</html>
