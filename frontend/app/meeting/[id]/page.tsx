@@ -25,12 +25,12 @@ export default function MeetingPage() {
     const remoteVideoRef = useRef<HTMLVideoElement>(null);
     const localStreamRef = useRef<MediaStream | null>(null);
     const pcRef = useRef<RTCPeerConnection | null>(null);
-    const recorderPcRef = useRef<RTCPeerConnection | null>(null); // Separate PC for server recording
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null); // Client-side recorder
+    const recordedChunksRef = useRef<Blob[]>([]);
     const screenStreamRef = useRef<MediaStream | null>(null);
     const isOfferCreatorRef = useRef<boolean>(false);
     const makingOfferRef = useRef<boolean>(false);
     const ignoreOfferRef = useRef<boolean>(false);
-    const shouldStartRecordingRef = useRef<boolean>(false); // Track if recording should start
 
     const configuration: RTCConfiguration = {
         iceServers: [
@@ -136,24 +136,6 @@ export default function MeetingPage() {
             if (!localStreamRef.current) setShouldStartCall(true);
         });
 
-        socket.on("start-recording", () => {
-            console.log("Both participants present, starting recording");
-            shouldStartRecordingRef.current = true;
-            // Start recording only when both participants are in the meeting
-            if (localStreamRef.current && !recorderPcRef.current) {
-                createRecorderPeerConnection(localStreamRef.current);
-            }
-        });
-
-        socket.on("stop-recording", () => {
-            console.log("Participant left, stopping recording");
-            // Stop recording when someone leaves
-            if (recorderPcRef.current) {
-                recorderPcRef.current.close();
-                recorderPcRef.current = null;
-            }
-        });
-
         socket.on("offer", async (data: { sdp: string; type: RTCSdpType }) => {
             console.log("Received offer from remote peer");
             await handleOffer(data);
@@ -176,18 +158,15 @@ export default function MeetingPage() {
             },
         );
 
-        socket.on("recorder-answer", async (data: { sdp: string; type: RTCSdpType }) => {
-            console.log("Received recorder answer from server");
-            await handleRecorderAnswer(data);
-        });
-
         return () => {
             if (localStreamRef.current)
                 localStreamRef.current.getTracks().forEach((t) => t.stop());
             if (screenStreamRef.current)
                 screenStreamRef.current.getTracks().forEach((t) => t.stop());
             if (pcRef.current) pcRef.current.close();
-            if (recorderPcRef.current) recorderPcRef.current.close();
+            if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+                mediaRecorderRef.current.stop();
+            }
             socket.disconnect();
         };
     }, [meetingId]);
@@ -241,11 +220,7 @@ export default function MeetingPage() {
                 isOfferCreatorRef.current = true;
 
                 createPeerConnection(stream);
-                
-                // Check if we should start recording (if the flag was set earlier)
-                if (shouldStartRecordingRef.current && !recorderPcRef.current) {
-                    createRecorderPeerConnection(stream);
-                }
+                startClientRecording(stream);
             } catch (err) {
                 console.error("Error accessing media devices:", err);
                 setError("Failed to access camera/microphone");
@@ -307,11 +282,7 @@ export default function MeetingPage() {
                     localVideoRef.current.srcObject = stream;
                 setIsCallActive(true);
                 createPeerConnection(stream);
-                
-                // Check if we should start recording (if the flag was set earlier)
-                if (shouldStartRecordingRef.current && !recorderPcRef.current) {
-                    createRecorderPeerConnection(stream);
-                }
+                startClientRecording(stream);
             }
 
             const pc = pcRef.current!;
@@ -363,56 +334,104 @@ export default function MeetingPage() {
         }
     };
 
-    // ============= Server Recording Functions =============
+    // ============= Client-Side Recording Functions =============
 
-    const createRecorderPeerConnection = (stream: MediaStream) => {
-        if (recorderPcRef.current) return;
-
-        const recorderPc = new RTCPeerConnection(configuration);
-        recorderPcRef.current = recorderPc;
-
-        // ICE candidates for recorder connection
-        recorderPc.addEventListener("icecandidate", (e) => {
-            if (e.candidate && socketRef.current) {
-                socketRef.current.emit("recorder-ice-candidate", {
-                    candidate: e.candidate.candidate,
-                    sdpMLineIndex: e.candidate.sdpMLineIndex,
-                    sdpMid: e.candidate.sdpMid,
-                });
+    const getSupportedMimeType = (): string => {
+        const possibleTypes = [
+            'video/webm;codecs=vp9,opus',
+            'video/webm;codecs=vp8,opus',
+            'video/webm;codecs=h264,opus',
+            'video/mp4;codecs=avc1.64003E,mp4a.40.2',
+            'video/webm',
+        ];
+        
+        for (const type of possibleTypes) {
+            if (MediaRecorder.isTypeSupported(type)) {
+                console.log(`Using MIME type: ${type}`);
+                return type;
             }
-        });
-
-        // Add local tracks to recorder
-        stream.getTracks().forEach((track) => {
-            recorderPc.addTrack(track, stream);
-            console.log(`Added ${track.kind} track to recorder peer connection`);
-        });
-
-        // Create and send offer to server
-        recorderPc.createOffer().then((offer) => {
-            return recorderPc.setLocalDescription(offer);
-        }).then(() => {
-            if (socketRef.current) {
-                socketRef.current.emit("recorder-offer", {
-                    sdp: recorderPc.localDescription!.sdp,
-                    type: recorderPc.localDescription!.type,
-                });
-                console.log("Sent recorder offer to server");
-            }
-        }).catch((err) => {
-            console.error("Error creating recorder offer:", err);
-        });
+        }
+        
+        console.warn('No supported MIME type found, using default');
+        return '';
     };
 
-    const handleRecorderAnswer = async (data: { sdp: string; type: RTCSdpType }) => {
+    const startClientRecording = (stream: MediaStream) => {
         try {
-            const recorderPc = recorderPcRef.current;
-            if (recorderPc && recorderPc.signalingState !== "stable") {
-                await recorderPc.setRemoteDescription(new RTCSessionDescription(data));
-                console.log("Server recording connection established");
-            }
+            recordedChunksRef.current = [];
+            
+            const mimeType = getSupportedMimeType();
+            const options: MediaRecorderOptions = mimeType ? { mimeType } : {};
+            
+            const mediaRecorder = new MediaRecorder(stream, options);
+            mediaRecorderRef.current = mediaRecorder;
+            
+            mediaRecorder.ondataavailable = (event: BlobEvent) => {
+                if (event.data && event.data.size > 0) {
+                    recordedChunksRef.current.push(event.data);
+                    console.log(`Recorded chunk: ${event.data.size} bytes`);
+                }
+            };
+            
+            mediaRecorder.onstop = async () => {
+                console.log('Recording stopped, uploading...');
+                await uploadRecording();
+            };
+            
+            mediaRecorder.onerror = (event: Event) => {
+                console.error('MediaRecorder error:', event);
+                setError('Recording error occurred');
+            };
+            
+            // Start recording with 1-second chunks
+            mediaRecorder.start(1000);
+            console.log(`Started client-side recording with MIME type: ${mimeType || 'default'}`);
+            
         } catch (err) {
-            console.error("Error handling recorder answer:", err);
+            console.error('Error starting client recording:', err);
+            setError('Failed to start recording');
+        }
+    };
+
+    const uploadRecording = async () => {
+        try {
+            if (recordedChunksRef.current.length === 0) {
+                console.warn('No recorded chunks to upload');
+                return;
+            }
+            
+            const mimeType = mediaRecorderRef.current?.mimeType || 'video/webm';
+            const blob = new Blob(recordedChunksRef.current, { type: mimeType });
+            
+            console.log(`Uploading recording: ${blob.size} bytes, type: ${blob.type}`);
+            
+            // Create form data
+            const formData = new FormData();
+            formData.append('video', blob, `recording.${mimeType.includes('mp4') ? 'mp4' : 'webm'}`);
+            formData.append('meeting_id', meetingId);
+            formData.append('participant_id', socketRef.current?.id || 'unknown');
+            
+            // Upload to server
+            const response = await fetch('https://api.tutorl.ink/api/recordings/upload', {
+                method: 'POST',
+                body: formData,
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                console.log('Recording uploaded successfully:', data);
+            } else {
+                const errorData = await response.json();
+                console.error('Upload failed:', errorData);
+                setError('Failed to upload recording');
+            }
+            
+            // Clear recorded chunks
+            recordedChunksRef.current = [];
+            
+        } catch (err) {
+            console.error('Error uploading recording:', err);
+            setError('Failed to upload recording');
         }
     };
 
@@ -425,7 +444,7 @@ export default function MeetingPage() {
             try {
                 const screenStream =
                     await navigator.mediaDevices.getDisplayMedia({
-                        video: { cursor: "always" },
+                        video: true,
                     });
                 if (!mounted) {
                     screenStream.getTracks().forEach((t) => t.stop());
@@ -495,13 +514,14 @@ export default function MeetingPage() {
     const handleShareScreen = () => setShouldShareScreen(true);
 
     const handleHangup = () => {
+        // Stop recording before cleanup
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+            mediaRecorderRef.current.stop();
+        }
+        
         if (pcRef.current) {
             pcRef.current.close();
             pcRef.current = null;
-        }
-        if (recorderPcRef.current) {
-            recorderPcRef.current.close();
-            recorderPcRef.current = null;
         }
         if (localStreamRef.current) {
             localStreamRef.current.getTracks().forEach((t) => t.stop());

@@ -17,7 +17,7 @@ from src.accept_tutor import accept_tutor
 from src.add_meeting import add_meeting
 from src.list_offers import list_offers
 from src.list_events import list_events, list_tutee_events, list_tutor_events
-from src.recording import meeting_recorder
+from src.recording import meeting_recorder, save_recording_blob, process_uploaded_recording
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -126,12 +126,10 @@ def handle_join(data):
         # Notify other members someone joined
         emit('user-joined', {'member_count': member_count}, room=eid, skip_sid=sid)
         
-        # If this is the second person, signal both peers are ready and start recording
+        # If this is the second person, signal both peers are ready
         if member_count == 2:
             emit('peer-ready', room=eid, include_self=True)
-            # Signal to start recording now that both participants are present
-            emit('start-recording', room=eid, include_self=True)
-            logger.info(f"Room {eid} now has 2 peers, signaling peer-ready and start-recording")
+            logger.info(f"Room {eid} now has 2 peers, signaling peer-ready")
             
     except Exception as e:
         logger.error(f"Error in handle_join: {e}", exc_info=True)
@@ -198,19 +196,7 @@ def handle_disconnect():
         if room_id:
             logger.info(f"User {sid} disconnecting from room {room_id}")
             
-            # --- START OF FIX ---
-            # Stop the recording *only* for the participant who is disconnecting.
-            # We assume the 'sid' is used as the 'participant_id' when 
-            # the recording was started.
-            try:
-                logger.info(f"Stopping recording for participant {sid} in room {room_id}")
-                # Call stop_recording, not stop_meeting_recording
-                run_async(meeting_recorder.stop_recording(room_id, sid))
-            except Exception as e:
-                logger.error(f"Error stopping participant recording: {e}")
-            # --- END OF FIX ---
-            
-            # Now, handle room membership and cleanup
+            # Handle room membership and cleanup
             if room_id in meeting_rooms:
                 # Remove user from room
                 if sid in meeting_rooms[room_id]['members']:
@@ -275,62 +261,7 @@ def handle_disconnect():
     except Exception as e:
         logger.error(f"Error in handle_disconnect: {e}", exc_info=True)
 
-@socketio.on('recorder-offer')
-def handle_recorder_offer(data):
-    """Handle WebRTC offer from client for server-side recording"""
-    try:
-        sid = request.sid
-        room_id = sid_to_room.get(sid)
-        
-        if not room_id:
-            emit('error', {'message': 'Not in a meeting room'})
-            return
-        
-        logger.info(f"[RECORDER] Received recorder offer from {sid} in room {room_id}")
-        logger.info(f"[RECORDER] Current recording sessions in room {room_id}: {list(meeting_recorder.sessions.get(room_id, {}).keys())}")
-        
-        async def process_offer():
-            # Create or get recording session
-            session = meeting_recorder.get_session(room_id, sid)
-            if not session:
-                logger.info(f"[RECORDER] Creating new recording session for {sid} in room {room_id}")
-                session = await meeting_recorder.start_recording(room_id, sid)
-            else:
-                logger.info(f"[RECORDER] Using existing recording session for {sid}")
-            
-            # Handle the offer and get answer
-            answer = await session.handle_offer(data)
-            return answer
-        
-        # Process offer and send answer
-        answer = run_async(process_offer())
-        emit('recorder-answer', answer)
-        logger.info(f"[RECORDER] Sent recorder answer to {sid}")
-        logger.info(f"[RECORDER] Total recording sessions in room {room_id}: {list(meeting_recorder.sessions.get(room_id, {}).keys())}")
-        
-    except Exception as e:
-        logger.error(f"Error in handle_recorder_offer: {e}", exc_info=True)
-        emit('error', {'message': 'Failed to process recorder offer'})
 
-
-@socketio.on('recorder-ice-candidate')
-def handle_recorder_ice_candidate(data):
-    """Handle ICE candidate from client for server-side recording"""
-    try:
-        sid = request.sid
-        room_id = sid_to_room.get(sid)
-        
-        if not room_id:
-            return
-        
-        logger.info(f"Received recorder ICE candidate from {sid}")
-        
-        session = meeting_recorder.get_session(room_id, sid)
-        if session:
-            run_async(session.add_ice_candidate(data))
-        
-    except Exception as e:
-        logger.error(f"Error in handle_recorder_ice_candidate: {e}", exc_info=True)
 # ============= Chat Socket.IO Event Handlers =============
 
 @socketio.on('join-chat')
@@ -737,28 +668,72 @@ def api_recordings_list():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/recordings/upload', methods=['POST'])
+def upload_recording():
+    """API endpoint to upload a recorded video blob from client"""
+    try:
+        # Get meeting_id and participant_id from form data or query params
+        meeting_id = request.form.get('meeting_id') or request.args.get('meeting_id')
+        participant_id = request.form.get('participant_id') or request.args.get('participant_id')
+        
+        if not meeting_id or not participant_id:
+            return jsonify({'error': 'meeting_id and participant_id are required'}), 400
+        
+        # Get the uploaded file
+        if 'video' not in request.files:
+            return jsonify({'error': 'No video file provided'}), 400
+        
+        video_file = request.files['video']
+        if video_file.filename == '':
+            return jsonify({'error': 'Empty filename'}), 400
+        
+        # Determine file extension from mimetype or filename
+        file_extension = 'webm'  # default
+        if video_file.content_type:
+            if 'webm' in video_file.content_type:
+                file_extension = 'webm'
+            elif 'mp4' in video_file.content_type:
+                file_extension = 'mp4'
+        
+        # Read the blob data
+        blob_data = video_file.read()
+        
+        if len(blob_data) == 0:
+            return jsonify({'error': 'Empty video file'}), 400
+        
+        # Save the recording
+        filepath = save_recording_blob(meeting_id, participant_id, blob_data, file_extension)
+        
+        # Trigger transcription in background
+        asyncio.create_task(process_uploaded_recording(meeting_id, participant_id, filepath))
+        
+        logger.info(f"Successfully uploaded recording for meeting {meeting_id}, participant {participant_id}")
+        
+        return jsonify({
+            'success': True,
+            'filepath': filepath,
+            'size': len(blob_data),
+            'message': 'Recording uploaded successfully'
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error uploading recording: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/recordings/status')
 def api_recordings_status():
     """API endpoint to check active recording sessions"""
     try:
         status = {
-            'active_meetings': len(meeting_recorder.sessions),
+            'active_meetings': len(meeting_recorder.active_meetings),
             'meetings': {}
         }
         
-        for meeting_id, participants in meeting_recorder.sessions.items():
+        for meeting_id, participants in meeting_recorder.active_meetings.items():
             status['meetings'][meeting_id] = {
                 'participant_count': len(participants),
-                'participants': list(participants.keys()),
-                'recording_status': {
-                    pid: {
-                        'is_recording': session.is_recording,
-                        'has_video': bool(session.video_track),
-                        'has_audio': bool(session.audio_track),
-                        'output_file': session.output_file
-                    }
-                    for pid, session in participants.items()
-                }
+                'participants': list(participants.keys())
             }
         
         return jsonify(status), 200
@@ -800,122 +775,6 @@ def api_meeting_recordings(meeting_id):
         logger.error(f"Error fetching meeting recordings: {e}", exc_info=True)
         return {'error': str(e)}, 500
 
-# @app.route('/api/transcripts/meeting/summary/<meeting_id>', methods=['GET'])
-# def api_summary_transcripts(meeting_id):
-#     """API endpoint to get summary of transcripts for a specific meeting"""
-#     try:
-#         # Call the existing api_meeting_transcripts function
-#         response, status_code = api_meeting_transcripts(meeting_id)
-        
-#         if status_code != 200:
-#             return response, status_code
-        
-#         # Extract just the transcript objects from the response
-#         transcripts_list = []
-#         for transcript in response.get('transcripts', []):
-#             transcripts_list.append({
-#                 'participant_id': transcript.get('participant_id'),
-#                 'transcript': transcript.get('transcript', ''),
-#                 'word_count': transcript.get('word_count', 0)
-#             })
-        
-#         return {'meeting_id': meeting_id, 'transcripts': transcripts_list}, 200
-#     except Exception as e:
-#         logger.error(f"Error fetching summary transcripts: {e}", exc_info=True)
-#         return {'error': str(e)}, 500
-
-@app.route('/api/transcripts_stitched/meeting/<meeting_id>')
-def api_meeting_transcripts_stitched(meeting_id):
-    try:
-        # Call the existing api_meeting_transcripts function
-        response, status_code = api_meeting_transcripts(meeting_id)
-        
-        if status_code != 200:
-            return response, status_code
-        
-        # Validate we have transcripts
-        transcripts_data = response.get('transcripts', [])
-        if not transcripts_data:
-            return {'error': 'No transcripts found for this meeting'}, 404
-        
-        # Process words from all participants
-        all_words = []
-        participants_with_words = 0
-        
-        for transcript in transcripts_data:
-            participant_id = transcript.get('participant_id')
-            words = transcript.get('words', [])
-            
-            if not words:
-                logger.warning(f"Participant {participant_id} has no words in transcript")
-                continue
-            
-            participants_with_words += 1
-            
-            # Extract and normalize words from this participant
-            for word in words:
-                all_words.append({
-                    'word': word.get('word', ''),
-                    'participant_id': participant_id,
-                    'start': word.get('start_time', 0)
-                })
-        
-        # Check if we have any words to process
-        if not all_words:
-            return {
-                'error': 'No words found in any transcript',
-                'participant_count': len(transcripts_data)
-            }, 404
-        
-        logger.info(f"Processing {len(all_words)} words from {participants_with_words} participants")
-        
-        # Sort all words by timestamp
-        all_words.sort(key=lambda x: x['start'])
-        
-        # Group words into sentences by speaker
-        sentences = []
-        if all_words:
-            cur_pid = all_words[0]['participant_id']
-            cur_words = []
-            
-            for w in all_words:
-                if w['participant_id'] != cur_pid:
-                    # Speaker changed, finalize current sentence
-                    if cur_words:
-                        text = " ".join([x['word'] for x in cur_words]).strip()
-                        if text:  # Only add non-empty sentences
-                            sentences.append({
-                                'participant_id': cur_pid, 
-                                'text': text, 
-                                'start': cur_words[0]['start'], 
-                                'end': cur_words[-1]['start']
-                            })
-                    cur_pid = w['participant_id']
-                    cur_words = [w]
-                else:
-                    cur_words.append(w)
-            
-            # Don't forget the last sentence
-            if cur_words:
-                text = " ".join([x['word'] for x in cur_words]).strip()
-                if text:  # Only add non-empty sentences
-                    sentences.append({
-                        'participant_id': cur_pid, 
-                        'text': text, 
-                        'start': cur_words[0]['start'], 
-                        'end': cur_words[-1]['start']
-                    })
-
-        return {
-            'sentences': sentences, 
-            'sentence_count': len(sentences),
-            'participant_count': participants_with_words,
-            'total_words': len(all_words)
-        }, 200
-        
-    except Exception as e:
-        logger.error(f"Error stitching meeting transcripts: {e}", exc_info=True)
-        return {'error': str(e)}, 500
 
 @app.route('/api/transcripts/meeting/<meeting_id>')
 def api_meeting_transcripts(meeting_id):
