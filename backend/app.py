@@ -274,8 +274,11 @@ def get_event_offer(event_id):
 
 
 # Accept a tutor for an event
-@app.route('/event/<int:event_id>/accept', methods=['POST', 'OPTIONS'])
+@app.route('/event/<int:event_id>/accept', methods=['POST'])
+@jwt_required()
+
 def accept_event_offer(event_id):
+    
     # Handle preflight request
     if request.method == 'OPTIONS':
         return '', 200
