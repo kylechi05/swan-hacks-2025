@@ -454,13 +454,30 @@ export default function MeetingPage() {
                         console.log("[Screen Share] Replacing video track with screen share");
 
                         // Replace the track
-                        var result = await videoSender.replaceTrack(screenTrack);
-                        console.log("[Screen Share] replaceTrack result:", result);
+                        await videoSender.replaceTrack(screenTrack);
                         console.log("[Screen Share] Track replaced. New track:", {
                             kind: screenTrack.kind,
                             id: screenTrack.id,
                             label: screenTrack.label
                         });
+
+                        // Force renegotiation to ensure remote peer gets the new track
+                        // This is needed because some browsers don't automatically renegotiate
+                        if (pc1Ref.current) {
+                            console.log("[Screen Share] Triggering renegotiation on PC1");
+                            const offer = await pc1Ref.current.createOffer();
+                            await pc1Ref.current.setLocalDescription(offer);
+                            if (socketRef.current) {
+                                socketRef.current.emit("offer", {
+                                    sdp: pc1Ref.current.localDescription!.sdp,
+                                    type: pc1Ref.current.localDescription!.type,
+                                });
+                            }
+                        } else if (pc2Ref.current) {
+                            console.log("[Screen Share] Cannot initiate renegotiation from PC2 (answerer)");
+                            // PC2 is the answerer, so it can't create a new offer
+                            // The track replacement should still work via existing connection
+                        }
                         
                         setIsScreenSharing(true);
 
@@ -485,6 +502,20 @@ export default function MeetingPage() {
                                     enabled: cameraTrack.enabled
                                 });
                                 await videoSender.replaceTrack(cameraTrack);
+
+                                // Force renegotiation when switching back to camera
+                                if (pc1Ref.current) {
+                                    console.log("[Screen Share] Triggering renegotiation to switch back to camera");
+                                    const offer = await pc1Ref.current.createOffer();
+                                    await pc1Ref.current.setLocalDescription(offer);
+                                    if (socketRef.current) {
+                                        socketRef.current.emit("offer", {
+                                            sdp: pc1Ref.current.localDescription!.sdp,
+                                            type: pc1Ref.current.localDescription!.type,
+                                        });
+                                    }
+                                }
+
                                 if (
                                     localVideoRef.current && localStreamRef.current
                                 ) {
