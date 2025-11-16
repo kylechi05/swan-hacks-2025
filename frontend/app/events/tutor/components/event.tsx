@@ -67,8 +67,8 @@ export function Event({ event, token }) {
         <div className="flex flex-col">
             <div className="flex items-center justify-between">
                 <div>
-                    <h2 className="text-lg font-semibold">{event.title}</h2>
-                    <p className="text-sm text-gray-400">{event.category}</p>
+                    <h2 className="text-lg font-bold text-green-600">{event.title}</h2>
+                    <p className="text-sm text-(--off-white)">{event.category}</p>
                 </div>
                 <button
                     onClick={() => setIsOpen(!isOpen)}
