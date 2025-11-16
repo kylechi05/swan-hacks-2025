@@ -73,6 +73,11 @@ def run_async(coro):
     loop = get_event_loop()
     future = asyncio.run_coroutine_threadsafe(coro, loop)
     return future.result(timeout=30)
+# Chat room management for events
+# Structure: {event_id: {'tutor_sid': sid, 'tutee_sid': sid, 'users': {sid: userid}}}
+chat_rooms = {}
+# Map session IDs to user info for chat
+chat_sid_to_user = {}  # {sid: {'userid': int, 'eventid': int}}
 
 @app.route('/')
 def index():
@@ -182,11 +187,12 @@ def handle_ice_candidate(data):
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    """Handle user disconnecting from meeting"""
+    """Handle user disconnecting from meeting and chat"""
     try:
         sid = request.sid
         room_id = sid_to_room.get(sid)
         
+        # Handle meeting room disconnect
         if room_id:
             logger.info(f"User {sid} disconnecting from room {room_id}")
             
@@ -219,6 +225,46 @@ def handle_disconnect():
             # Remove sid mapping
             del sid_to_room[sid]
             leave_room(room_id)
+        
+        # Handle chat room disconnect
+        if sid in chat_sid_to_user:
+            user_info = chat_sid_to_user[sid]
+            eventid = user_info['eventid']
+            userid = user_info['userid']
+            user_role = user_info['role']
+            
+            logger.info(f"User {userid} disconnecting from chat for event {eventid}")
+            
+            chat_room_name = f"chat_{eventid}"
+            
+            # Remove user from chat room
+            if eventid in chat_rooms:
+                if sid in chat_rooms[eventid]['users']:
+                    del chat_rooms[eventid]['users'][sid]
+                
+                # Clear tutor or tutee sid
+                if chat_rooms[eventid]['tutor_sid'] == sid:
+                    chat_rooms[eventid]['tutor_sid'] = None
+                elif chat_rooms[eventid]['tutee_sid'] == sid:
+                    chat_rooms[eventid]['tutee_sid'] = None
+                
+                member_count = len(chat_rooms[eventid]['users'])
+                
+                # Notify remaining members
+                emit('user-left-chat', {
+                    'userid': userid,
+                    'role': user_role,
+                    'member_count': member_count
+                }, room=chat_room_name)
+                
+                # Clean up empty chat rooms
+                if member_count == 0:
+                    del chat_rooms[eventid]
+                    logger.info(f"Chat room for event {eventid} is empty, removing it")
+            
+            # Remove sid mapping
+            del chat_sid_to_user[sid]
+            leave_room(chat_room_name)
             
         logger.info(f"User {sid} disconnected")
         
@@ -277,6 +323,244 @@ def handle_recorder_ice_candidate(data):
         
     except Exception as e:
         logger.error(f"Error in handle_recorder_ice_candidate: {e}", exc_info=True)
+# ============= Chat Socket.IO Event Handlers =============
+
+@socketio.on('join-chat')
+def handle_join_chat(data):
+    """Handle user joining a chat room for an event"""
+    try:
+        eventid = data.get('eventid')
+        userid = data.get('userid')
+        user_role = data.get('role')  # 'tutor' or 'tutee'
+        sid = request.sid
+        
+        if not eventid or not userid:
+            emit('chat-error', {'message': 'Missing eventid or userid'})
+            logger.warning(f"join-chat called without required data: {data}")
+            return
+        
+        logger.info(f"User {userid} ({user_role}) attempting to join chat for event {eventid}")
+        
+        # Verify the user is authorized for this event (tutor or tutee)
+        from src.database import get_db_session
+        from src.models import RequestedEvent
+        
+        session = get_db_session()
+        try:
+            event = session.query(RequestedEvent).filter_by(eventid=eventid).first()
+            
+            if not event:
+                emit('chat-error', {'message': 'Event not found'})
+                logger.warning(f"Event {eventid} not found")
+                return
+            
+            # Check if user is the tutor or tutee
+            is_authorized = (event.userid_tutee == userid or event.userid_tutor == userid)
+            
+            if not is_authorized:
+                emit('chat-error', {'message': 'Unauthorized: You are not part of this event'})
+                logger.warning(f"User {userid} not authorized for event {eventid}")
+                return
+            
+            # Initialize chat room if it doesn't exist
+            if eventid not in chat_rooms:
+                chat_rooms[eventid] = {
+                    'tutor_sid': None,
+                    'tutee_sid': None,
+                    'users': {}
+                }
+            
+            # Add user to chat room
+            chat_room_name = f"chat_{eventid}"
+            join_room(chat_room_name)
+            
+            # Track user info
+            chat_sid_to_user[sid] = {
+                'userid': userid,
+                'eventid': eventid,
+                'role': user_role
+            }
+            chat_rooms[eventid]['users'][sid] = userid
+            
+            # Set tutor or tutee sid
+            if event.userid_tutor == userid:
+                chat_rooms[eventid]['tutor_sid'] = sid
+            elif event.userid_tutee == userid:
+                chat_rooms[eventid]['tutee_sid'] = sid
+            
+            member_count = len(chat_rooms[eventid]['users'])
+            logger.info(f"User {userid} joined chat for event {eventid}. Chat now has {member_count} member(s)")
+            
+            # Notify user they successfully joined
+            emit('chat-joined', {
+                'eventid': eventid,
+                'member_count': member_count,
+                'role': user_role
+            })
+            
+            # Notify other members someone joined
+            emit('user-joined-chat', {
+                'userid': userid,
+                'role': user_role,
+                'member_count': member_count
+            }, room=chat_room_name, skip_sid=sid)
+            
+        finally:
+            session.close()
+            
+    except Exception as e:
+        logger.error(f"Error in handle_join_chat: {e}", exc_info=True)
+        emit('chat-error', {'message': 'Failed to join chat'})
+
+
+@socketio.on('send-message')
+def handle_send_message(data):
+    """Handle sending a chat message in an event"""
+    try:
+        sid = request.sid
+        message = data.get('message')
+        eventid = data.get('eventid')
+        
+        if sid not in chat_sid_to_user:
+            emit('chat-error', {'message': 'Not in any chat room'})
+            logger.warning(f"User {sid} not in any chat room")
+            return
+        
+        user_info = chat_sid_to_user[sid]
+        stored_eventid = user_info['eventid']
+        userid = user_info['userid']
+        user_role = user_info['role']
+        
+        # Verify eventid matches
+        if eventid and eventid != stored_eventid:
+            emit('chat-error', {'message': 'Event ID mismatch'})
+            logger.warning(f"Event ID mismatch for user {sid}: {eventid} vs {stored_eventid}")
+            return
+        
+        if not message:
+            emit('chat-error', {'message': 'Empty message'})
+            return
+        
+        # Get sender name from database
+        from src.database import get_db_session
+        from src.models import User
+        
+        session = get_db_session()
+        try:
+            user = session.query(User).filter_by(userid=userid).first()
+            sender_name = user.name if user else f"User {userid}"
+            
+            chat_room_name = f"chat_{stored_eventid}"
+            timestamp = datetime.now().isoformat()
+            
+            message_data = {
+                'message': message,
+                'userid': userid,
+                'sender_name': sender_name,
+                'role': user_role,
+                'timestamp': timestamp,
+                'eventid': stored_eventid
+            }
+            
+            logger.info(f"User {userid} sent message to chat {stored_eventid}: {message[:50]}...")
+            
+            # Broadcast message to all users in the chat room (including sender)
+            emit('receive-message', message_data, room=chat_room_name, include_self=True)
+            
+        finally:
+            session.close()
+            
+    except Exception as e:
+        logger.error(f"Error in handle_send_message: {e}", exc_info=True)
+        emit('chat-error', {'message': 'Failed to send message'})
+
+
+@socketio.on('leave-chat')
+def handle_leave_chat(data):
+    """Handle user leaving a chat room"""
+    try:
+        sid = request.sid
+        eventid = data.get('eventid') if isinstance(data, dict) else None
+        
+        if sid not in chat_sid_to_user:
+            logger.warning(f"User {sid} not in any chat room")
+            return
+        
+        user_info = chat_sid_to_user[sid]
+        stored_eventid = user_info['eventid']
+        userid = user_info['userid']
+        user_role = user_info['role']
+        
+        # Use provided eventid or stored eventid
+        event_to_leave = eventid if eventid else stored_eventid
+        
+        logger.info(f"User {userid} leaving chat for event {event_to_leave}")
+        
+        chat_room_name = f"chat_{event_to_leave}"
+        
+        # Remove user from chat room
+        if event_to_leave in chat_rooms:
+            if sid in chat_rooms[event_to_leave]['users']:
+                del chat_rooms[event_to_leave]['users'][sid]
+            
+            # Clear tutor or tutee sid
+            if chat_rooms[event_to_leave]['tutor_sid'] == sid:
+                chat_rooms[event_to_leave]['tutor_sid'] = None
+            elif chat_rooms[event_to_leave]['tutee_sid'] == sid:
+                chat_rooms[event_to_leave]['tutee_sid'] = None
+            
+            member_count = len(chat_rooms[event_to_leave]['users'])
+            
+            # Notify remaining members
+            emit('user-left-chat', {
+                'userid': userid,
+                'role': user_role,
+                'member_count': member_count
+            }, room=chat_room_name)
+            
+            # Clean up empty chat rooms
+            if member_count == 0:
+                del chat_rooms[event_to_leave]
+                logger.info(f"Chat room for event {event_to_leave} is empty, removing it")
+        
+        # Remove sid mapping
+        del chat_sid_to_user[sid]
+        leave_room(chat_room_name)
+        
+        # Notify user they left
+        emit('chat-left', {'eventid': event_to_leave})
+        
+    except Exception as e:
+        logger.error(f"Error in handle_leave_chat: {e}", exc_info=True)
+        emit('chat-error', {'message': 'Failed to leave chat'})
+
+
+@socketio.on('typing')
+def handle_typing(data):
+    """Handle typing indicator"""
+    try:
+        sid = request.sid
+        is_typing = data.get('is_typing', False)
+        
+        if sid not in chat_sid_to_user:
+            return
+        
+        user_info = chat_sid_to_user[sid]
+        eventid = user_info['eventid']
+        userid = user_info['userid']
+        user_role = user_info['role']
+        
+        chat_room_name = f"chat_{eventid}"
+        
+        # Broadcast typing indicator to other users (not self)
+        emit('user-typing', {
+            'userid': userid,
+            'role': user_role,
+            'is_typing': is_typing
+        }, room=chat_room_name, skip_sid=sid)
+        
+    except Exception as e:
+        logger.error(f"Error in handle_typing: {e}", exc_info=True)
 
 
 
