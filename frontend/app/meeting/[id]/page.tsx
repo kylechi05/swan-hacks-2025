@@ -7,13 +7,13 @@ import { io, Socket } from "socket.io-client";
 export default function MeetingPage() {
     const params = useParams();
     const meetingId = params.id as string;
-    
+
     const [isConnected, setIsConnected] = useState(false);
     const [memberCount, setMemberCount] = useState(0);
     const [isCallActive, setIsCallActive] = useState(false);
     const [isScreenSharing, setIsScreenSharing] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    
+
     const socketRef = useRef<Socket | null>(null);
     const localVideoRef = useRef<HTMLVideoElement>(null);
     const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -24,86 +24,97 @@ export default function MeetingPage() {
 
     const configuration: RTCConfiguration = {
         iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' },
-            { urls: 'stun:stun2.l.google.com:19302' },
+            { urls: "stun:stun.l.google.com:19302" },
+            { urls: "stun:stun1.l.google.com:19302" },
+            { urls: "stun:stun2.l.google.com:19302" },
             {
-                urls: 'turn:numb.viagenie.ca',
-                username: 'webrtc@live.com',
-                credential: 'muazkh'
+                urls: "turn:numb.viagenie.ca",
+                username: "webrtc@live.com",
+                credential: "muazkh",
             },
-            {
-                urls: 'turn:192.158.29.39:3478?transport=udp',
-                username: 'YzYNCouZM1mhqhmseWk6',
-                credential: 'YzYNCouZM1mhqhmseWk6'
-            },
-            {
-                urls: 'turn:192.158.29.39:3478?transport=tcp',
-                username: 'YzYNCouZM1mhqhmseWk6',
-                credential: 'YzYNCouZM1mhqhmseWk6'
-            }
+    {
+      urls: 'turn:192.158.29.39:3478?transport=udp',
+      username: '28224511:1379330808',
+      credential: 'JZEOEt2V3Qb0y27GRntt2u2PAYA='
+    },
+    {
+      urls: 'turn:192.158.29.39:3478?transport=tcp',
+      username: '28224511:1379330808',
+      credential: 'JZEOEt2V3Qb0y27GRntt2u2PAYA='
+    }
         ],
         iceCandidatePoolSize: 10,
-        bundlePolicy: 'max-bundle',
-        iceTransportPolicy: 'all'
+        bundlePolicy: "max-bundle",
+        iceTransportPolicy: "all",
     };
 
     useEffect(() => {
         // Initialize socket connection
-        const socket = io('https://api.tutorl.ink');
+        const socket = io("https://api.tutorl.ink");
         socketRef.current = socket;
 
-        socket.on('connect', () => {
-            console.log('Connected to server');
+        socket.on("connect", () => {
+            console.log("Connected to server");
             setIsConnected(true);
-            socket.emit('join', { eid: meetingId });
+            socket.emit("join", { eid: meetingId });
         });
 
-        socket.on('joined', (data: { room: string; member_count: number }) => {
+        socket.on("joined", (data: { room: string; member_count: number }) => {
             console.log(`Successfully joined room ${data.room}`);
             setMemberCount(data.member_count);
         });
 
-        socket.on('user-joined', (data: { member_count: number }) => {
+        socket.on("user-joined", (data: { member_count: number }) => {
             console.log(`Another user joined`);
             setMemberCount(data.member_count);
         });
 
-        socket.on('user-left', (data: { member_count: number }) => {
+        socket.on("user-left", (data: { member_count: number }) => {
             console.log(`A user left`);
             setMemberCount(data.member_count);
         });
 
-        socket.on('error', (data: { message: string }) => {
-            console.error('Socket error:', data.message);
+        socket.on("error", (data: { message: string }) => {
+            console.error("Socket error:", data.message);
             setError(data.message);
         });
 
-        socket.on('peer-ready', () => {
-            console.log('Another peer is ready');
+        socket.on("peer-ready", () => {
+            console.log("Another peer is ready");
             if (!localStreamRef.current && !pc1Ref.current) {
                 handleStart();
             }
         });
 
-        socket.on('offer', async (data: { sdp: string; type: RTCSdpType }) => {
-            console.log('Received offer from remote peer');
+        socket.on("offer", async (data: { sdp: string; type: RTCSdpType }) => {
+            console.log("Received offer from remote peer");
             await handleOffer(data);
         });
 
-        socket.on('answer', async (data: { sdp: string; type: RTCSdpType }) => {
-            console.log('Received answer from remote peer');
+        socket.on("answer", async (data: { sdp: string; type: RTCSdpType }) => {
+            console.log("Received answer from remote peer");
             await handleAnswer(data);
         });
 
-        socket.on('ice-candidate', async (data: { candidate: string; sdpMLineIndex: number; sdpMid: string }) => {
-            console.log('Received ICE candidate');
-            await handleIceCandidate(data);
-        });
+        socket.on(
+            "ice-candidate",
+            async (
+                data: {
+                    candidate: string;
+                    sdpMLineIndex: number;
+                    sdpMid: string;
+                },
+            ) => {
+                console.log("Received ICE candidate");
+                await handleIceCandidate(data);
+            },
+        );
 
         return () => {
             if (localStreamRef.current) {
-                localStreamRef.current.getTracks().forEach(track => track.stop());
+                localStreamRef.current.getTracks().forEach((track) =>
+                    track.stop()
+                );
             }
             if (pc1Ref.current) pc1Ref.current.close();
             if (pc2Ref.current) pc2Ref.current.close();
@@ -115,7 +126,10 @@ export default function MeetingPage() {
         try {
             // Get local stream if we don't have it
             if (!localStreamRef.current) {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: true,
+                    video: true,
+                });
                 if (localVideoRef.current) {
                     localVideoRef.current.srcObject = stream;
                 }
@@ -126,18 +140,18 @@ export default function MeetingPage() {
             // Create peer connection
             if (!pc2Ref.current) {
                 pc2Ref.current = new RTCPeerConnection(configuration);
-                
-                pc2Ref.current.addEventListener('icecandidate', (e) => {
+
+                pc2Ref.current.addEventListener("icecandidate", (e) => {
                     if (e.candidate && socketRef.current) {
-                        socketRef.current.emit('ice-candidate', {
+                        socketRef.current.emit("ice-candidate", {
                             candidate: e.candidate.candidate,
                             sdpMLineIndex: e.candidate.sdpMLineIndex,
-                            sdpMid: e.candidate.sdpMid
+                            sdpMid: e.candidate.sdpMid,
                         });
                     }
                 });
 
-                pc2Ref.current.addEventListener('track', (e) => {
+                pc2Ref.current.addEventListener("track", (e) => {
                     if (remoteVideoRef.current && e.streams[0]) {
                         remoteVideoRef.current.srcObject = e.streams[0];
                     }
@@ -145,56 +159,68 @@ export default function MeetingPage() {
 
                 // Add local stream
                 if (localStreamRef.current) {
-                    localStreamRef.current.getTracks().forEach(track => {
-                        pc2Ref.current!.addTrack(track, localStreamRef.current!);
+                    localStreamRef.current.getTracks().forEach((track) => {
+                        pc2Ref.current!.addTrack(
+                            track,
+                            localStreamRef.current!,
+                        );
                     });
                 }
             }
 
-            await pc2Ref.current.setRemoteDescription(new RTCSessionDescription(data));
+            await pc2Ref.current.setRemoteDescription(
+                new RTCSessionDescription(data),
+            );
             const answer = await pc2Ref.current.createAnswer();
             await pc2Ref.current.setLocalDescription(answer);
 
             if (socketRef.current) {
-                socketRef.current.emit('answer', {
+                socketRef.current.emit("answer", {
                     sdp: pc2Ref.current.localDescription!.sdp,
-                    type: pc2Ref.current.localDescription!.type
+                    type: pc2Ref.current.localDescription!.type,
                 });
             }
         } catch (error) {
-            console.error('Error handling offer:', error);
-            setError('Failed to handle connection offer');
+            console.error("Error handling offer:", error);
+            setError("Failed to handle connection offer");
         }
     };
 
     const handleAnswer = async (data: { sdp: string; type: RTCSdpType }) => {
         try {
             if (pc1Ref.current) {
-                await pc1Ref.current.setRemoteDescription(new RTCSessionDescription(data));
+                await pc1Ref.current.setRemoteDescription(
+                    new RTCSessionDescription(data),
+                );
             }
         } catch (error) {
-            console.error('Error handling answer:', error);
+            console.error("Error handling answer:", error);
         }
     };
 
-    const handleIceCandidate = async (data: { candidate: string; sdpMLineIndex: number; sdpMid: string }) => {
+    const handleIceCandidate = async (
+        data: { candidate: string; sdpMLineIndex: number; sdpMid: string },
+    ) => {
         try {
             const candidate = new RTCIceCandidate(data);
-            
+
             if (pc1Ref.current && pc1Ref.current.remoteDescription) {
                 await pc1Ref.current.addIceCandidate(candidate);
             } else if (pc2Ref.current && pc2Ref.current.remoteDescription) {
                 await pc2Ref.current.addIceCandidate(candidate);
             }
         } catch (error) {
-            console.error('Error adding ICE candidate:', error);
+            console.error("Error adding ICE candidate:", error);
         }
     };
 
     const handleStart = async () => {
         try {
             // Get local stream
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+            const stream = await navigator.mediaDevices.getUserMedia({
+                audio: true,
+                video: true,
+            });
             if (localVideoRef.current) {
                 localVideoRef.current.srcObject = stream;
             }
@@ -204,43 +230,43 @@ export default function MeetingPage() {
             // Create peer connection
             pc1Ref.current = new RTCPeerConnection(configuration);
 
-            pc1Ref.current.addEventListener('icecandidate', (e) => {
+            pc1Ref.current.addEventListener("icecandidate", (e) => {
                 if (e.candidate && socketRef.current) {
-                    socketRef.current.emit('ice-candidate', {
+                    socketRef.current.emit("ice-candidate", {
                         candidate: e.candidate.candidate,
                         sdpMLineIndex: e.candidate.sdpMLineIndex,
-                        sdpMid: e.candidate.sdpMid
+                        sdpMid: e.candidate.sdpMid,
                     });
                 }
             });
 
-            pc1Ref.current.addEventListener('track', (e) => {
+            pc1Ref.current.addEventListener("track", (e) => {
                 if (remoteVideoRef.current && e.streams[0]) {
                     remoteVideoRef.current.srcObject = e.streams[0];
                 }
             });
 
             // Add local stream to peer connection
-            stream.getTracks().forEach(track => {
+            stream.getTracks().forEach((track) => {
                 pc1Ref.current!.addTrack(track, stream);
             });
 
             // Create and send offer
             const offer = await pc1Ref.current.createOffer({
                 offerToReceiveAudio: true,
-                offerToReceiveVideo: true
+                offerToReceiveVideo: true,
             });
             await pc1Ref.current.setLocalDescription(offer);
 
             if (socketRef.current) {
-                socketRef.current.emit('offer', {
+                socketRef.current.emit("offer", {
                     sdp: pc1Ref.current.localDescription!.sdp,
-                    type: pc1Ref.current.localDescription!.type
+                    type: pc1Ref.current.localDescription!.type,
                 });
             }
         } catch (error) {
-            console.error('Error starting call:', error);
-            setError('Failed to access camera/microphone');
+            console.error("Error starting call:", error);
+            setError("Failed to access camera/microphone");
             setIsCallActive(false);
         }
     };
@@ -248,8 +274,8 @@ export default function MeetingPage() {
     const handleShareScreen = async () => {
         try {
             const screenStream = await navigator.mediaDevices.getDisplayMedia({
-                video: { cursor: 'always' } as MediaTrackConstraints,
-                audio: false
+                video: { cursor: "always" } as MediaTrackConstraints,
+                audio: false,
             });
 
             screenStreamRef.current = screenStream;
@@ -259,7 +285,9 @@ export default function MeetingPage() {
             const pc = pc1Ref.current || pc2Ref.current;
             if (pc) {
                 const senders = pc.getSenders();
-                const videoSender = senders.find(sender => sender.track?.kind === 'video');
+                const videoSender = senders.find((sender) =>
+                    sender.track?.kind === "video"
+                );
 
                 if (videoSender && localStreamRef.current) {
                     await videoSender.replaceTrack(screenTrack);
@@ -272,11 +300,15 @@ export default function MeetingPage() {
 
                     // Handle screen share stop
                     screenTrack.onended = async () => {
-                        const cameraTrack = localStreamRef.current?.getVideoTracks()[0];
+                        const cameraTrack = localStreamRef.current
+                            ?.getVideoTracks()[0];
                         if (cameraTrack && videoSender) {
                             await videoSender.replaceTrack(cameraTrack);
-                            if (localVideoRef.current && localStreamRef.current) {
-                                localVideoRef.current.srcObject = localStreamRef.current;
+                            if (
+                                localVideoRef.current && localStreamRef.current
+                            ) {
+                                localVideoRef.current.srcObject =
+                                    localStreamRef.current;
                             }
                         }
                         setIsScreenSharing(false);
@@ -284,8 +316,8 @@ export default function MeetingPage() {
                 }
             }
         } catch (error) {
-            console.error('Error sharing screen:', error);
-            setError('Failed to share screen');
+            console.error("Error sharing screen:", error);
+            setError("Failed to share screen");
         }
     };
 
@@ -302,11 +334,13 @@ export default function MeetingPage() {
 
         // Stop all tracks
         if (localStreamRef.current) {
-            localStreamRef.current.getTracks().forEach(track => track.stop());
+            localStreamRef.current.getTracks().forEach((track) => track.stop());
             localStreamRef.current = null;
         }
         if (screenStreamRef.current) {
-            screenStreamRef.current.getTracks().forEach(track => track.stop());
+            screenStreamRef.current.getTracks().forEach((track) =>
+                track.stop()
+            );
             screenStreamRef.current = null;
         }
 
@@ -324,14 +358,22 @@ export default function MeetingPage() {
             <div className="border-b border-(--primary-border-color) bg-zinc-900 px-8 py-4">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-2xl font-semibold">Tutoring Session</h1>
-                        <p className="text-sm text-(--light-gray)">Meeting ID: {meetingId}</p>
+                        <h1 className="text-2xl font-semibold">
+                            Tutoring Session
+                        </h1>
+                        <p className="text-sm text-(--light-gray)">
+                            Meeting ID: {meetingId}
+                        </p>
                     </div>
                     <div className="flex items-center gap-4">
                         <div className="flex items-center gap-2">
-                            <div className={`h-2 w-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+                            <div
+                                className={`h-2 w-2 rounded-full ${
+                                    isConnected ? "bg-green-500" : "bg-red-500"
+                                }`}
+                            />
                             <span className="text-sm text-(--light-gray)">
-                                {isConnected ? 'Connected' : 'Disconnected'}
+                                {isConnected ? "Connected" : "Disconnected"}
                             </span>
                         </div>
                         <div className="text-sm text-(--light-gray)">
@@ -371,9 +413,11 @@ export default function MeetingPage() {
                 {!isCallActive && (
                     <div className="absolute inset-0 flex items-center justify-center bg-black/80">
                         <div className="text-center">
-                            <h2 className="mb-2 text-xl font-semibold">Ready to start?</h2>
+                            <h2 className="mb-2 text-xl font-semibold">
+                                Ready to start?
+                            </h2>
                             <p className="text-(--light-gray)">
-                                {memberCount === 1 
+                                {memberCount === 1
                                     ? "Waiting for other participant to join..."
                                     : "Click Start to begin the session"}
                             </p>
