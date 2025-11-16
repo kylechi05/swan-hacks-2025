@@ -13,6 +13,7 @@ function formatDate(date: number | string) {
         hour: "numeric",
         minute: "2-digit",
         hour12: true,
+        timeZoneName: "short"
     }).format(new Date(value));
 }
 
@@ -207,7 +208,7 @@ export default function MyEvents() {
                                                                     {tutor.name ||
                                                                         `Tutor ${tutor.userid_tutor}`}
                                                                 </span>
-                                                                <span className="flex flex-col text-xs text-gray-400">
+                                                                <span className="flex flex-col text-xs text-(--light-gray)">
                                                                     <span>
                                                                         Start:{" "}
                                                                         {formatDate(

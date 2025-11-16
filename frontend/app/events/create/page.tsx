@@ -4,6 +4,10 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/app/authContext";
 
+function toLocalUnix(dateStr, timeStr) {
+    return Math.floor(new Date(`${dateStr}T${timeStr}:00`).getTime() / 1000);
+}
+
 export default function CreateEvent() {
     const { token } = useAuth();
     const router = useRouter();
@@ -56,10 +60,8 @@ export default function CreateEvent() {
         }
         setError("");
         try {
-            const start = new Date(`${form.startDate}T${form.startTime}:00`);
-            const startUnix = Math.floor(start.getTime() / 1000);
-            const end = new Date(`${form.endDate}T${form.endTime}:00`);
-            const endUnix = Math.floor(end.getTime() / 1000);
+            const startUnix = toLocalUnix(form.startDate, form.startTime);
+            const endUnix = toLocalUnix(form.endDate, form.endTime);
 
             const res = await fetch("https://api.tutorl.ink/event/create", {
                 method: "POST",

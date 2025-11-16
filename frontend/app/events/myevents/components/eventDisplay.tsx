@@ -9,8 +9,10 @@ function formatDate(date: number | string) {
         hour: "numeric",
         minute: "2-digit",
         hour12: true,
+        timeZoneName: "short"
     }).format(new Date(value));
 }
+
 
 export function EventDisplay({
     event,
@@ -32,7 +34,7 @@ export function EventDisplay({
 
             <p className="mt-2 text-sm">{event.description}</p>
 
-            <div className="mt-1 text-xs text-gray-500">
+            <div className="mt-1 text-xs text-(--light-gray)">
                 <p>Start: {formatDate(startTime)}</p>
                 <p>End: {formatDate(endTime)}</p>
             </div>
