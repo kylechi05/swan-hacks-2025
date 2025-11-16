@@ -157,6 +157,11 @@ export default function MeetingPage() {
                 if (localVideoRef.current) {
                     localVideoRef.current.srcObject = stream;
                 }
+                console.log("[Local Stream] Acquired media stream:", {
+                    streamId: stream.id,
+                    audioTracks: stream.getAudioTracks().map(t => ({ id: t.id, label: t.label, enabled: t.enabled })),
+                    videoTracks: stream.getVideoTracks().map(t => ({ id: t.id, label: t.label, enabled: t.enabled }))
+                });
                 setIsCallActive(true);
                 isOfferCreatorRef.current = true;
             } catch (error) {
@@ -192,9 +197,19 @@ export default function MeetingPage() {
                 });
 
                 pc1Ref.current.addEventListener("track", (e) => {
-                    console.log("Track received:", e.track.kind);
+                    console.log("[PC1] Track received:", {
+                        kind: e.track.kind,
+                        id: e.track.id,
+                        label: e.track.label,
+                        enabled: e.track.enabled,
+                        muted: e.track.muted,
+                        readyState: e.track.readyState
+                    });
                     if (remoteVideoRef.current && e.streams[0]) {
-                        console.log("Setting remote video stream");
+                        console.log("[PC1] Setting remote video stream:", {
+                            streamId: e.streams[0].id,
+                            tracks: e.streams[0].getTracks().map(t => ({ kind: t.kind, id: t.id, label: t.label }))
+                        });
                         remoteVideoRef.current.srcObject = e.streams[0];
                     }
                 });
@@ -219,7 +234,9 @@ export default function MeetingPage() {
 
                 // Add local stream to peer connection
                 if (localStreamRef.current) {
+                    console.log("[PC1] Adding tracks to peer connection:");
                     localStreamRef.current.getTracks().forEach((track) => {
+                        console.log(`[PC1] Adding ${track.kind} track:`, { id: track.id, label: track.label, enabled: track.enabled });
                         pc1Ref.current!.addTrack(track, localStreamRef.current!);
                     });
                 }
@@ -230,6 +247,19 @@ export default function MeetingPage() {
                     offerToReceiveVideo: true,
                 });
                 await pc1Ref.current.setLocalDescription(offer);
+
+                // Log what this peer connection is sending
+                const senders = pc1Ref.current.getSenders();
+                console.log("[PC1] Currently sending tracks:", senders.map(sender => ({
+                    track: sender.track ? {
+                        kind: sender.track.kind,
+                        id: sender.track.id,
+                        label: sender.track.label,
+                        enabled: sender.track.enabled,
+                        muted: sender.track.muted,
+                        readyState: sender.track.readyState
+                    } : null
+                })));
 
                 if (socketRef.current) {
                     socketRef.current.emit("offer", {
@@ -257,6 +287,11 @@ export default function MeetingPage() {
                 if (localVideoRef.current) {
                     localVideoRef.current.srcObject = stream;
                 }
+                console.log("[HandleOffer] Acquired media stream:", {
+                    streamId: stream.id,
+                    audioTracks: stream.getAudioTracks().map(t => ({ id: t.id, label: t.label, enabled: t.enabled })),
+                    videoTracks: stream.getVideoTracks().map(t => ({ id: t.id, label: t.label, enabled: t.enabled }))
+                });
                 localStreamRef.current = stream;
                 setIsCallActive(true);
             }
@@ -276,9 +311,19 @@ export default function MeetingPage() {
                 });
 
                 pc2Ref.current.addEventListener("track", (e) => {
-                    console.log("Track received:", e.track.kind);
+                    console.log("[PC2] Track received:", {
+                        kind: e.track.kind,
+                        id: e.track.id,
+                        label: e.track.label,
+                        enabled: e.track.enabled,
+                        muted: e.track.muted,
+                        readyState: e.track.readyState
+                    });
                     if (remoteVideoRef.current && e.streams[0]) {
-                        console.log("Setting remote video stream");
+                        console.log("[PC2] Setting remote video stream:", {
+                            streamId: e.streams[0].id,
+                            tracks: e.streams[0].getTracks().map(t => ({ kind: t.kind, id: t.id, label: t.label }))
+                        });
                         remoteVideoRef.current.srcObject = e.streams[0];
                     }
                 });
@@ -289,7 +334,9 @@ export default function MeetingPage() {
 
                 // Add local stream
                 if (localStreamRef.current) {
+                    console.log("[PC2] Adding tracks to peer connection:");
                     localStreamRef.current.getTracks().forEach((track) => {
+                        console.log(`[PC2] Adding ${track.kind} track:`, { id: track.id, label: track.label, enabled: track.enabled });
                         pc2Ref.current!.addTrack(
                             track,
                             localStreamRef.current!,
@@ -303,6 +350,19 @@ export default function MeetingPage() {
             );
             const answer = await pc2Ref.current.createAnswer();
             await pc2Ref.current.setLocalDescription(answer);
+
+            // Log what this peer connection is sending
+            const senders = pc2Ref.current.getSenders();
+            console.log("[PC2] Currently sending tracks:", senders.map(sender => ({
+                track: sender.track ? {
+                    kind: sender.track.kind,
+                    id: sender.track.id,
+                    label: sender.track.label,
+                    enabled: sender.track.enabled,
+                    muted: sender.track.muted,
+                    readyState: sender.track.readyState
+                } : null
+            })));
 
             if (socketRef.current) {
                 socketRef.current.emit("answer", {
@@ -366,7 +426,14 @@ export default function MeetingPage() {
 
                 screenStreamRef.current = screenStream;
                 const screenTrack = screenStream.getVideoTracks()[0];
-                console.log("Got screen track:", screenTrack.id);
+                console.log("[Screen Share] Got screen track:", {
+                    id: screenTrack.id,
+                    label: screenTrack.label,
+                    enabled: screenTrack.enabled,
+                    muted: screenTrack.muted,
+                    readyState: screenTrack.readyState,
+                    settings: screenTrack.getSettings()
+                });
 
                 // Find active peer connection and replace video track
                 const pc = pc1Ref.current || pc2Ref.current;
@@ -375,13 +442,25 @@ export default function MeetingPage() {
                     const videoSender = senders.find((sender) =>
                         sender.track?.kind === "video"
                     );
-
                     if (videoSender && localStreamRef.current) {
-                        console.log("Replacing video track with screen share");
+                        console.log("[Screen Share] Current video sender:", {
+                            track: videoSender.track ? {
+                                kind: videoSender.track.kind,
+                                id: videoSender.track.id,
+                                label: videoSender.track.label,
+                                enabled: videoSender.track.enabled
+                            } : null
+                        });
+                        console.log("[Screen Share] Replacing video track with screen share");
 
                         // Replace the track
-                        console.log(videoSender);
                         await videoSender.replaceTrack(screenTrack);
+                        console.log("[Screen Share] Track replaced. New track:", {
+                            kind: screenTrack.kind,
+                            id: screenTrack.id,
+                            label: screenTrack.label
+                        });
+                        
                         setIsScreenSharing(true);
 
                         // Show screen share in local video
@@ -395,10 +474,15 @@ export default function MeetingPage() {
                         screenTrack.onended = async () => {
                             if (!mounted) return;
                             
-                            console.log("Screen share ended, switching back to camera");
+                            console.log("[Screen Share] Screen share ended, switching back to camera");
                             const cameraTrack = localStreamRef.current
                                 ?.getVideoTracks()[0];
                             if (cameraTrack && videoSender) {
+                                console.log("[Screen Share] Replacing with camera track:", {
+                                    id: cameraTrack.id,
+                                    label: cameraTrack.label,
+                                    enabled: cameraTrack.enabled
+                                });
                                 await videoSender.replaceTrack(cameraTrack);
                                 if (
                                     localVideoRef.current && localStreamRef.current
@@ -451,6 +535,35 @@ export default function MeetingPage() {
     const handleShareScreen = () => {
         setShouldShareScreen(true);
     };
+
+    const logCurrentSenders = () => {
+        const pc = pc1Ref.current || pc2Ref.current;
+        if (pc) {
+            const senders = pc.getSenders();
+            const pcName = pc1Ref.current ? 'PC1' : 'PC2';
+            console.log(`[${pcName}] Active senders:`, senders.map(sender => ({
+                track: sender.track ? {
+                    kind: sender.track.kind,
+                    id: sender.track.id,
+                    label: sender.track.label,
+                    enabled: sender.track.enabled,
+                    muted: sender.track.muted,
+                    readyState: sender.track.readyState
+                } : null
+            })));
+        } else {
+            console.log("[Debug] No active peer connection");
+        }
+    };
+
+    // Expose logging function for debugging
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            (window as any).logCurrentSenders = logCurrentSenders;
+            (window as any).pc1 = pc1Ref;
+            (window as any).pc2 = pc2Ref;
+        }
+    }, []);
 
     const handleHangup = () => {
         // Close peer connections
