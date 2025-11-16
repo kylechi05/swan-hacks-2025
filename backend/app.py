@@ -618,6 +618,7 @@ def recordings_list():
                         'participant_id': participant_id,
                         'timestamp': timestamp,
                         'size': f"{stat.st_size / (1024*1024):.2f} MB",
+                        'size_mb': stat.st_size / (1024*1024),
                         'created': datetime.fromtimestamp(stat.st_ctime).strftime('%Y-%m-%d %H:%M:%S')
                     }
                     recordings.append(recording_data)
