@@ -119,6 +119,12 @@ export default function MeetingPage() {
         socket.on("user-joined", (data: { member_count: number }) => {
             console.log("Another user joined");
             setMemberCount(data.member_count);
+            
+            // Clear recorded chunks to sync recordings when someone joins
+            if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+                recordedChunksRef.current = [];
+                console.log("Cleared recording cache for sync");
+            }
         });
 
         socket.on("user-left", (data: { member_count: number }) => {
