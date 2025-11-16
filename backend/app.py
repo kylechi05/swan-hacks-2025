@@ -363,8 +363,8 @@ def handle_join_chat(data):
             is_authorized = (event.userid_tutee == userid or str(event.userid_tutor) == str(userid))
             
             if not is_authorized:
-                emit('chat-error', {'message': 'Unauthorized: You are not part of this event'})
-                logger.warning(f"User {userid} not authorized for event {eventid}. Correct user - {event.userid_tutor}")
+                emit('chat-error', {'message': f'User {userid} not authorized for event {eventid}. Correct user - {event.userid_tutor}'})
+                print(f"User {userid} not authorized for event {eventid}. Correct user - {event.userid_tutor}")
                 return
             
             # Initialize chat room if it doesn't exist
