@@ -703,37 +703,68 @@ def upload_recording():
         if len(blob_data) == 0:
             return jsonify({'error': 'Empty video file'}), 400
 
-        # Force mp4 storage. If incoming is webm, convert after temp save
-        incoming_ext = 'webm' if 'webm' in original_content_type or video_file.filename.lower().endswith('.webm') else 'mp4'
-
-        if incoming_ext == 'mp4':
-            filepath = save_recording_blob(meeting_id, participant_id, blob_data, 'mp4')
-        else:
+        # Always convert to mp4 - webm is unreliable
+        is_webm = 'webm' in original_content_type or (video_file.filename and video_file.filename.lower().endswith('.webm'))
+        
+        if is_webm:
+            # Save as temporary webm file
             temp_path = save_recording_blob(meeting_id, participant_id, blob_data, 'webm')
+            
+            # Prepare mp4 output path
             base_name = os.path.splitext(os.path.basename(temp_path))[0]
-            final_filename = base_name + '.mp4' if not base_name.endswith('.mp4') else base_name
-            final_path = os.path.join(os.path.dirname(temp_path), final_filename)
+            final_path = os.path.join(os.path.dirname(temp_path), base_name + '.mp4')
+            
+            # Convert webm to mp4 with re-encoding to ensure compatibility
             convert_cmd = [
-                'ffmpeg', '-y', '-i', temp_path,
-                '-c:v', 'copy',
-                '-c:a', 'aac',
+                'ffmpeg', '-y',
+                '-i', temp_path,
+                '-c:v', 'libx264',  # Re-encode video to h264
+                '-preset', 'medium',
+                '-crf', '23',
+                '-c:a', 'aac',      # Re-encode audio to aac
+                '-b:a', '128k',
+                '-movflags', '+faststart',  # Optimize for web playback
                 final_path
             ]
+            
             try:
                 logger.info(f"Converting webm to mp4: {' '.join(convert_cmd)}")
-                result = subprocess.run(convert_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120)
+                result = subprocess.run(convert_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=300)
+                
                 if result.returncode != 0:
-                    logger.warning(f"ffmpeg conversion failed; keeping webm. stderr={result.stderr.decode(errors='ignore')[:300]}")
-                    filepath = temp_path
-                else:
-                    filepath = final_path
+                    error_output = result.stderr.decode(errors='ignore')
+                    logger.error(f"ffmpeg conversion failed. stderr={error_output}")
+                    # Delete the corrupted webm file
                     try:
                         os.remove(temp_path)
                     except OSError:
                         pass
+                    return jsonify({'error': 'Failed to convert video to MP4', 'details': error_output[:500]}), 500
+                else:
+                    filepath = final_path
+                    logger.info(f"Successfully converted to MP4: {filepath}")
+                    # Remove temp webm file
+                    try:
+                        os.remove(temp_path)
+                    except OSError as e:
+                        logger.warning(f"Failed to remove temp file: {e}")
+            except subprocess.TimeoutExpired:
+                logger.error("ffmpeg conversion timed out")
+                try:
+                    os.remove(temp_path)
+                except OSError:
+                    pass
+                return jsonify({'error': 'Video conversion timed out'}), 500
             except Exception as conv_err:
-                logger.error(f"Exception during conversion: {conv_err}")
-                filepath = temp_path
+                logger.error(f"Exception during conversion: {conv_err}", exc_info=True)
+                try:
+                    os.remove(temp_path)
+                except OSError:
+                    pass
+                return jsonify({'error': 'Failed to convert video', 'details': str(conv_err)}), 500
+        else:
+            # Already mp4, save directly
+            filepath = save_recording_blob(meeting_id, participant_id, blob_data, 'mp4')
 
         size_bytes = len(blob_data)
         logger.info(f"Saved recording file at {filepath} size={size_bytes}B (~{size_bytes/(1024*1024):.2f} MB)")
@@ -754,8 +785,8 @@ def upload_recording():
             'size_bytes': size_bytes,
             'size_mb': f"{size_bytes/(1024*1024):.2f}",
             'content_type_in': original_content_type,
-            'stored_extension': 'mp4' if filepath.lower().endswith('.mp4') else 'webm',
-            'message': 'Recording uploaded successfully'
+            'stored_extension': 'mp4',  # Always MP4 now
+            'message': 'Recording uploaded and converted to MP4 successfully'
         }), 200
         
     except Exception as e:
