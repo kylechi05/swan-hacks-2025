@@ -454,7 +454,8 @@ export default function MeetingPage() {
                         console.log("[Screen Share] Replacing video track with screen share");
 
                         // Replace the track
-                        await videoSender.replaceTrack(screenTrack);
+                        var result = await videoSender.replaceTrack(screenTrack);
+                        console.log("[Screen Share] replaceTrack result:", result);
                         console.log("[Screen Share] Track replaced. New track:", {
                             kind: screenTrack.kind,
                             id: screenTrack.id,
