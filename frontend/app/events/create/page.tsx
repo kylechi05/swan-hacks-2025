@@ -84,13 +84,11 @@ export default function CreateEvent() {
             }
 
             const data = await res.json();
-            console.log("Success:", data);
             router.push(`/events/success?event_id=${data.event_id}&from=create`)
         } catch (err) {
             console.error("Request failed:", err);
             setError("Failed to connect to server.");
         }
-        console.log("Event data:", form);
     };
 
     return (

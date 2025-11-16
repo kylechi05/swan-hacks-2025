@@ -27,8 +27,10 @@ export default function TutorEvent() {
                 }
 
                 const data = await res.json();
-                setAllEvents(data.events);
-                console.log(data.events);
+                const openEvents = data.events.filter((event) => (
+                    event.userid_tutor === null
+                ))
+                setAllEvents(openEvents);
             } catch (err) {
                 console.error("Request failed:", err);
             }

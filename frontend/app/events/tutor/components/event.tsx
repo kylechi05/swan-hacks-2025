@@ -52,7 +52,6 @@ export function Event({ event, token }) {
             }
 
             const data = await res.json();
-            console.log("Offer confirmed:", data);
             setStartTime("");
             setEndTime("");
             setIsOpen(false);

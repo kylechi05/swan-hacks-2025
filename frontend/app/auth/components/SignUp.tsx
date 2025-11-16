@@ -20,8 +20,6 @@ export function SignUp() {
         }
 
         setError("");
-        console.log("Sign-up data:", form);
-
         try {
             const res = await fetch("https://api.tutorl.ink/signup", {
                 method: "POST",
@@ -42,8 +40,8 @@ export function SignUp() {
             }
 
             const data = await res.json();
-            console.log("Server response:", data);
             console.log(data)
+            window.location.href = "/auth";
         } catch (err) {
             console.error("Request failed:", err);
             setError("Failed to connect to server.");
