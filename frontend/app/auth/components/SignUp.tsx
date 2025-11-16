@@ -19,14 +19,14 @@ export function SignUp() {
             return;
         }
 
-        setError(""); // clear errors if successful
+        setError("");
         console.log("Sign-up data:", form);
 
         try {
             const res = await fetch("http://localhost:6969/signup", {
-                method: "POST", // POST request
+                method: "POST",
                 headers: {
-                    "Content-Type": "application/json", // tell server it's JSON
+                    "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
                     name: form.name,
@@ -36,7 +36,6 @@ export function SignUp() {
             });
 
             if (!res.ok) {
-                // If server returned an error
                 const errorData = await res.json();
                 setError(errorData.message || "Something went wrong.");
                 return;

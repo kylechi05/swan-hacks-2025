@@ -17,9 +17,9 @@ export function SignIn() {
 
         try {
             const res = await fetch("http://localhost:6969/login", {
-                method: "POST", // POST request
+                method: "POST",
                 headers: {
-                    "Content-Type": "application/json", // tell server it's JSON
+                    "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
                     email: formState.email,
@@ -28,7 +28,6 @@ export function SignIn() {
             });
 
             if (!res.ok) {
-                // If server returned an error
                 const errorData = await res.json();
                 setError(
                     errorData.message || "Incorrect username or password.",

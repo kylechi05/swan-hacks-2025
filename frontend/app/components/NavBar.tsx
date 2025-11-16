@@ -9,7 +9,7 @@ export function NavBar() {
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
-        setMounted(true); // Only render after client mounts
+        setMounted(true);
     }, []);
 
     return (
