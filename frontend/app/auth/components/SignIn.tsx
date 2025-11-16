@@ -81,7 +81,7 @@ export function SignIn() {
 
                 <button
                     type="submit"
-                    className="cursor-pointer rounded-lg bg-blue-500 px-4 py-2 text-white transition-all hover:scale-105 hover:bg-blue-600"
+                    className="transition-all cursor-pointer rounded-lg hover:bg-blue-600 bg-blue-900 px-4 py-2 text-white hover:scale-105"
                 >
                     Sign In
                 </button>

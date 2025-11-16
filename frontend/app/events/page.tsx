@@ -14,10 +14,10 @@ export default function EventsPage() {
                     </p>
                     <Link
                         href="/events/create"
-                        className="mt-auto cursor-pointer rounded-lg bg-blue-600 px-4 py-2 text-center text-white transition-all hover:scale-105 hover:bg-blue-500"
-                    >
+                        className="mt-auto cursor-pointer rounded-lg border-2 border-green-600 bg-gradient-to-r from-green-600/35 to-green-600/35 px-4 py-2 text-center text-white transition-all hover:scale-105 hover:border-green-400 hover:from-green-600/50 hover:to-green-600/50">
                         Create Event
                     </Link>
+
                 </div>
 
                 {/* Tutor Others Card */}
@@ -29,7 +29,7 @@ export default function EventsPage() {
                     </p>
                     <Link
                         href="/events/tutor"
-                        className="mt-auto cursor-pointer rounded-lg bg-green-600 px-4 py-2 text-center text-white transition-all hover:scale-105 hover:bg-green-500"
+                        className="mt-auto cursor-pointer rounded-lg bg-green-600 px-4 py-2 text-center text-white transition-all hover:scale-105 hover:border-green-700 hover:bg-green-500"
                     >
                         Sign Up to Tutor
                     </Link>
