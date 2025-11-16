@@ -24,20 +24,20 @@ export function NavBar() {
             <Link href="/join-meeting" className="hover:text-(--off-white)">
                 Join Meeting
             </Link>
+            <Link
+                href="/recordings"
+                className="ml-auto hover:text-(--off-white)"
+            >
+                Meeting History
+            </Link>
 
             {mounted &&
                 (token === "" ? (
-                    <Link
-                        href="/auth"
-                        className="ml-auto hover:text-(--off-white)"
-                    >
+                    <Link href="/auth" className="hover:text-(--off-white)">
                         Sign in
                     </Link>
                 ) : (
-                    <Link
-                        href="/profile"
-                        className="ml-auto hover:text-(--off-white)"
-                    >
+                    <Link href="/profile" className="hover:text-(--off-white)">
                         Profile
                     </Link>
                 ))}
