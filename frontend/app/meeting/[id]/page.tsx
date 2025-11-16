@@ -24,6 +24,8 @@ export default function MeetingPage() {
     const pc2Ref = useRef<RTCPeerConnection | null>(null);
     const screenStreamRef = useRef<MediaStream | null>(null);
     const isOfferCreatorRef = useRef<boolean>(false);
+    const makingOfferRef = useRef<boolean>(false);
+    const ignoreOfferRef = useRef<boolean>(false);
 
     const configuration: RTCConfiguration = {
         iceServers: [
@@ -135,6 +137,25 @@ export default function MeetingPage() {
         };
     }, [meetingId]);
 
+    // Centralized offer-answer exchange function
+    const runOfferAnswer = async (pc: RTCPeerConnection) => {
+        if (!socketRef.current) return;
+        
+        try {
+            console.log("[Renegotiation] Starting offer-answer exchange");
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            
+            socketRef.current.emit("offer", {
+                sdp: pc.localDescription!.sdp,
+                type: pc.localDescription!.type,
+            });
+            console.log("[Renegotiation] Offer sent");
+        } catch (error) {
+            console.error("[Renegotiation] Error during offer-answer:", error);
+        }
+    };
+
     // Effect to get user media when call starts
     useEffect(() => {
         if (!shouldStartCall || localStreamRef.current) return;
@@ -215,20 +236,27 @@ export default function MeetingPage() {
                 });
 
                 pc1Ref.current.addEventListener("negotiationneeded", async () => {
-                    console.log("Negotiation needed, creating new offer");
+                    console.log("[PC1] Negotiation needed event fired");
                     try {
-                        if (pc1Ref.current && pc1Ref.current.signalingState !== "closed") {
-                            const offer = await pc1Ref.current.createOffer();
-                            await pc1Ref.current.setLocalDescription(offer);
-                            if (socketRef.current) {
-                                socketRef.current.emit("offer", {
-                                    sdp: pc1Ref.current.localDescription!.sdp,
-                                    type: pc1Ref.current.localDescription!.type,
-                                });
-                            }
+                        if (!pc1Ref.current || pc1Ref.current.signalingState === "closed") {
+                            console.log("[PC1] Peer connection closed, skipping negotiation");
+                            return;
                         }
+
+                        // Prevent collisions during negotiation
+                        if (makingOfferRef.current) {
+                            console.log("[PC1] Already making an offer, skipping");
+                            return;
+                        }
+
+                        makingOfferRef.current = true;
+                        console.log("[PC1] Starting negotiation sequence");
+                        await runOfferAnswer(pc1Ref.current);
+                        makingOfferRef.current = false;
+                        console.log("[PC1] Negotiation sequence complete");
                     } catch (error) {
-                        console.error("Error during renegotiation:", error);
+                        console.error("[PC1] Error during renegotiation:", error);
+                        makingOfferRef.current = false;
                     }
                 });
 
@@ -267,6 +295,7 @@ export default function MeetingPage() {
                         type: pc1Ref.current.localDescription!.type,
                     });
                 }
+                console.log("[PC1] Initial offer sent");
             } catch (error) {
                 console.error("Error creating peer connection:", error);
                 setError("Failed to establish connection");
@@ -274,10 +303,12 @@ export default function MeetingPage() {
         };
 
         createPeerConnection();
-    }, [isCallActive, configuration]);
+    }, [isCallActive]);
 
     const handleOffer = async (data: { sdp: string; type: RTCSdpType }) => {
         try {
+            console.log("[HandleOffer] Processing incoming offer");
+            
             // Get local stream if we don't have it
             if (!localStreamRef.current) {
                 const stream = await navigator.mediaDevices.getUserMedia({
@@ -298,6 +329,7 @@ export default function MeetingPage() {
 
             // Create peer connection
             if (!pc2Ref.current) {
+                console.log("[HandleOffer] Creating PC2 (answerer)");
                 pc2Ref.current = new RTCPeerConnection(configuration);
 
                 pc2Ref.current.addEventListener("icecandidate", (e) => {
@@ -328,10 +360,6 @@ export default function MeetingPage() {
                     }
                 });
 
-                pc2Ref.current.addEventListener("negotiationneeded", async () => {
-                    console.log("Negotiation needed on pc2");
-                });
-
                 // Add local stream
                 if (localStreamRef.current) {
                     console.log("[PC2] Adding tracks to peer connection:");
@@ -345,9 +373,21 @@ export default function MeetingPage() {
                 }
             }
 
+            // Handle the offer using proper sequence
+            const offerCollision = pc2Ref.current.signalingState !== "stable";
+            ignoreOfferRef.current = offerCollision;
+            
+            if (ignoreOfferRef.current) {
+                console.log("[HandleOffer] Ignoring offer due to collision");
+                return;
+            }
+
+            console.log("[HandleOffer] Setting remote description");
             await pc2Ref.current.setRemoteDescription(
                 new RTCSessionDescription(data),
             );
+            
+            console.log("[HandleOffer] Creating answer");
             const answer = await pc2Ref.current.createAnswer();
             await pc2Ref.current.setLocalDescription(answer);
 
@@ -364,12 +404,14 @@ export default function MeetingPage() {
                 } : null
             })));
 
+            console.log("[HandleOffer] Sending answer");
             if (socketRef.current) {
                 socketRef.current.emit("answer", {
                     sdp: pc2Ref.current.localDescription!.sdp,
                     type: pc2Ref.current.localDescription!.type,
                 });
             }
+            console.log("[HandleOffer] Answer sent successfully");
         } catch (error) {
             console.error("Error handling offer:", error);
             setError("Failed to handle connection offer");
@@ -378,10 +420,14 @@ export default function MeetingPage() {
 
     const handleAnswer = async (data: { sdp: string; type: RTCSdpType }) => {
         try {
+            console.log("[HandleAnswer] Processing answer");
             if (pc1Ref.current && pc1Ref.current.signalingState !== "stable") {
                 await pc1Ref.current.setRemoteDescription(
                     new RTCSessionDescription(data),
                 );
+                console.log("[HandleAnswer] Remote description set successfully");
+            } else {
+                console.log("[HandleAnswer] Skipping - already in stable state or no PC");
             }
         } catch (error) {
             console.error("Error handling answer:", error);
@@ -461,23 +507,8 @@ export default function MeetingPage() {
                             label: screenTrack.label
                         });
 
-                        // Force renegotiation to ensure remote peer gets the new track
-                        // This is needed because some browsers don't automatically renegotiate
-                        if (pc1Ref.current) {
-                            console.log("[Screen Share] Triggering renegotiation on PC1");
-                            const offer = await pc1Ref.current.createOffer();
-                            await pc1Ref.current.setLocalDescription(offer);
-                            if (socketRef.current) {
-                                socketRef.current.emit("offer", {
-                                    sdp: pc1Ref.current.localDescription!.sdp,
-                                    type: pc1Ref.current.localDescription!.type,
-                                });
-                            }
-                        } else if (pc2Ref.current) {
-                            console.log("[Screen Share] Cannot initiate renegotiation from PC2 (answerer)");
-                            // PC2 is the answerer, so it can't create a new offer
-                            // The track replacement should still work via existing connection
-                        }
+                        // The negotiationneeded event handler will automatically trigger renegotiation
+                        console.log("[Screen Share] Track replaced, negotiationneeded will handle renegotiation");
                         
                         setIsScreenSharing(true);
 
@@ -503,18 +534,8 @@ export default function MeetingPage() {
                                 });
                                 await videoSender.replaceTrack(cameraTrack);
 
-                                // Force renegotiation when switching back to camera
-                                if (pc1Ref.current) {
-                                    console.log("[Screen Share] Triggering renegotiation to switch back to camera");
-                                    const offer = await pc1Ref.current.createOffer();
-                                    await pc1Ref.current.setLocalDescription(offer);
-                                    if (socketRef.current) {
-                                        socketRef.current.emit("offer", {
-                                            sdp: pc1Ref.current.localDescription!.sdp,
-                                            type: pc1Ref.current.localDescription!.type,
-                                        });
-                                    }
-                                }
+                                // The negotiationneeded event handler will automatically trigger renegotiation
+                                console.log("[Screen Share] Camera track replaced, negotiationneeded will handle renegotiation");
 
                                 if (
                                     localVideoRef.current && localStreamRef.current
