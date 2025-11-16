@@ -18,7 +18,7 @@ export default function MyEvents() {
     useEffect(() => {
         const getTuteeEvents = async () => {
             try {
-                const res = await fetch("http://localhost:6969/events/tutee", {
+                const res = await fetch("https://api.tutorl.ink/events/tutee", {
                     headers: { Authorization: `Bearer ${token}` },
                 });
                 if (!res.ok) throw new Error("Failed to fetch tutee events");
@@ -49,7 +49,7 @@ export default function MyEvents() {
 
         const getTutorEvents = async () => {
             try {
-                const res = await fetch("http://localhost:6969/events/tutor", {
+                const res = await fetch("https://api.tutorl.ink/events/tutor", {
                     headers: { Authorization: `Bearer ${token}` },
                 });
                 if (!res.ok) throw new Error("Failed to fetch tutor events");

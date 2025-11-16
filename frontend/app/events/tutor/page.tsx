@@ -13,7 +13,7 @@ export default function TutorEvent() {
     useEffect(() => {
         async function getAllEvents() {
             try {
-                const res = await fetch("http://localhost:6969/events", {
+                const res = await fetch("https://api.tutorl.ink/events", {
                     method: "GET",
                     headers: {
                         "Content-Type": "application/json",
@@ -36,7 +36,7 @@ export default function TutorEvent() {
 
         async function loadSubjects() {
             try {
-                const res = await fetch("http://localhost:6969/subjects", {
+                const res = await fetch("https://api.tutorl.ink/subjects", {
                     method: "GET",
                     headers: {
                         "Content-Type": "application/json",
