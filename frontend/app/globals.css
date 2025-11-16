@@ -5,6 +5,14 @@
     --font-montserrat: var(--font-montserrat);
     --font-elms-sans: var(--font-elms-sans);
 }
+@layer base {
+  p, h1, h2, h3, span, div {
+    word-spacing: -0.12em;
+    
+    letter-spacing: -0.00em;
+  }
+}
+
 
 :root {
   --background: #0a0a0a;
