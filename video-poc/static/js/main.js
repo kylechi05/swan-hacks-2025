@@ -114,7 +114,6 @@ socket.on('peer-ready', function() {
 });
 
 const startButton = document.getElementById('startButton');
-const callButton = document.getElementById('callButton');
 const hangupButton = document.getElementById('hangupButton');
 hangupButton.disabled = true;
 startButton.addEventListener('click', start);
