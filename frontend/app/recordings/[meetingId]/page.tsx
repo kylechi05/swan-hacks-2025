@@ -28,6 +28,10 @@ interface Transcript {
     created: string;
 }
 
+const sliderClass =
+  "w-full h-2 cursor-pointer rounded-lg bg-gray-700 accent-green-500 transition-all hover:accent-green-400 focus:outline-none focus:ring-2 focus:ring-green-500";
+
+
 export default function SyncedRecordingPage() {
     const params = useParams();
     const router = useRouter();
@@ -366,7 +370,7 @@ export default function SyncedRecordingPage() {
                                     if (v) v.currentTime = seekTime;
                                 });
                             }}
-                            className="h-2 w-full cursor-pointer rounded-lg bg-gray-700 accent-green-500"
+                            className={sliderClass}
                         />
                     </div>
 
@@ -391,7 +395,7 @@ export default function SyncedRecordingPage() {
                                             parseInt(e.target.value),
                                         )
                                     }
-                                    className="h-2 flex-1 cursor-pointer appearance-none rounded-lg bg-gray-700"
+                                    className={sliderClass}
                                 />
                             </div>
                         ))}
