@@ -1,4 +1,4 @@
-
+import logging
 from flask_socketio import SocketIO, send, emit, join_room, leave_room
 from flask import Flask, render_template, Response, request
 from flask_cors import CORS
@@ -14,6 +14,9 @@ from src.add_meeting import add_meeting
 from src.list_offers import list_offers
 from src.list_events import list_events, list_tutee_events, list_tutor_events
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Create a Flask app instance
 app = Flask(__name__, static_url_path='/static')
@@ -28,47 +31,164 @@ CORS(app)
 # Initialize JWT
 jwt = JWTManager(app)
 
+# Initialize SocketIO
+socketio = SocketIO(app, cors_allowed_origins="*")
+
 # Initialize database
 with app.app_context():
     init_db()
-
-socketio = SocketIO(app)
 
 # Cleanup database session after each request
 @app.teardown_appcontext
 def shutdown_session(exception=None):
     close_db_session()
 
-socketio = SocketIO(app)
-
-# TODO: Move users to DB, or find better way to handle what users are in what rooms
-users = {}
-
-# Set to keep track of RTCPeerConnection instances
-pcs = set()
+# Meeting room management
+# Structure: {room_id: {'members': [sid1, sid2], 'event_id': eid}}
+meeting_rooms = {}
+# Map session IDs to room IDs
+sid_to_room = {}
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
-# Handle new user joining
+@app.route('/meeting/<eid>') 
+def meeting(eid):
+    return render_template('meeting.html', eid=eid)
+
+# ============= Socket.IO Event Handlers =============
+
 @socketio.on('join')
-def handle_join(username):
-    users[request.sid] = username  # Store username by session ID
-    join_room(username)  # Each user gets their own "room"
-    emit("message", f"{username} joined the chat", room=username)
+def handle_join(data):
+    """Handle user joining a meeting room"""
+    try:
+        eid = data.get('eid') if isinstance(data, dict) else data
+        sid = request.sid
+        
+        logger.info(f"User {sid} attempting to join room {eid}")
+        
+        # Initialize room if it doesn't exist
+        if eid not in meeting_rooms:
+            meeting_rooms[eid] = {
+                'members': [],
+                'event_id': eid
+            }
+        
+        # Check if room is full (max 2 participants for 1-on-1 tutoring)
+        if len(meeting_rooms[eid]['members']) >= 2:
+            emit('error', {'message': 'Meeting room is full'})
+            logger.warning(f"Room {eid} is full, rejecting user {sid}")
+            return
+        
+        # Add user to room
+        join_room(eid)
+        meeting_rooms[eid]['members'].append(sid)
+        sid_to_room[sid] = eid
+        
+        member_count = len(meeting_rooms[eid]['members'])
+        logger.info(f"User {sid} joined room {eid}. Room now has {member_count} member(s)")
+        
+        # Notify user they successfully joined
+        emit('joined', {'room': eid, 'member_count': member_count})
+        
+        # Notify other members someone joined
+        emit('user-joined', {'member_count': member_count}, room=eid, skip_sid=sid)
+        
+        # If this is the second person, signal both peers are ready
+        if member_count == 2:
+            emit('peer-ready', room=eid, include_self=True)
+            logger.info(f"Room {eid} now has 2 peers, signaling peer-ready")
+            
+    except Exception as e:
+        logger.error(f"Error in handle_join: {e}", exc_info=True)
+        emit('error', {'message': 'Failed to join meeting'})
 
-# Handle user messages
-@socketio.on('message')
-def handle_message(data):
-    username = users.get(request.sid, "Anonymous")  # Get the user's name
-    emit("message", f"{username}: {data}", broadcast=True)  # Send to everyone
+@socketio.on('offer')
+def handle_offer(data):
+    """Forward WebRTC offer to other peer in room"""
+    try:
+        sid = request.sid
+        room_id = sid_to_room.get(sid)
+        
+        if not room_id:
+            logger.warning(f"User {sid} not in any room, cannot forward offer")
+            return
+        
+        logger.info(f"Forwarding offer from {sid} in room {room_id}")
+        emit('offer', data, room=room_id, skip_sid=sid)
+        
+    except Exception as e:
+        logger.error(f"Error in handle_offer: {e}", exc_info=True)
 
-# Handle disconnects
+@socketio.on('answer')
+def handle_answer(data):
+    """Forward WebRTC answer to other peer in room"""
+    try:
+        sid = request.sid
+        room_id = sid_to_room.get(sid)
+        
+        if not room_id:
+            logger.warning(f"User {sid} not in any room, cannot forward answer")
+            return
+        
+        logger.info(f"Forwarding answer from {sid} in room {room_id}")
+        emit('answer', data, room=room_id, skip_sid=sid)
+        
+    except Exception as e:
+        logger.error(f"Error in handle_answer: {e}", exc_info=True)
+
+@socketio.on('ice-candidate')
+def handle_ice_candidate(data):
+    """Forward ICE candidate to other peer in room"""
+    try:
+        sid = request.sid
+        room_id = sid_to_room.get(sid)
+        
+        if not room_id:
+            logger.warning(f"User {sid} not in any room, cannot forward ICE candidate")
+            return
+        
+        logger.info(f"Forwarding ICE candidate from {sid} in room {room_id}")
+        emit('ice-candidate', data, room=room_id, skip_sid=sid)
+        
+    except Exception as e:
+        logger.error(f"Error in handle_ice_candidate: {e}", exc_info=True)
+
 @socketio.on('disconnect')
 def handle_disconnect():
-    username = users.pop(request.sid, "Anonymous")
-    emit("message", f"{username} left the chat", broadcast=True)
+    """Handle user disconnecting from meeting"""
+    try:
+        sid = request.sid
+        room_id = sid_to_room.get(sid)
+        
+        if room_id:
+            logger.info(f"User {sid} disconnecting from room {room_id}")
+            
+            # Remove user from room
+            if room_id in meeting_rooms:
+                if sid in meeting_rooms[room_id]['members']:
+                    meeting_rooms[room_id]['members'].remove(sid)
+                
+                member_count = len(meeting_rooms[room_id]['members'])
+                
+                # Notify remaining members
+                emit('user-left', {'member_count': member_count}, room=room_id)
+                
+                # Clean up empty rooms
+                if member_count == 0:
+                    del meeting_rooms[room_id]
+                    logger.info(f"Room {room_id} is empty, removing it")
+            
+            # Remove sid mapping
+            del sid_to_room[sid]
+            leave_room(room_id)
+            
+        logger.info(f"User {sid} disconnected")
+        
+    except Exception as e:
+        logger.error(f"Error in handle_disconnect: {e}", exc_info=True)
+
 
 
 @app.route('/signup', methods=['POST'])
