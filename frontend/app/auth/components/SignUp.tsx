@@ -40,7 +40,6 @@ export function SignUp() {
             }
 
             const data = await res.json();
-            console.log(data)
             window.location.href = "/auth";
         } catch (err) {
             console.error("Request failed:", err);

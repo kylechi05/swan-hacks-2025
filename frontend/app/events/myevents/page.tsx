@@ -314,7 +314,7 @@ export default function MyEvents() {
                     <div className="w-1/2">
                         <h3 className="mb-2 text-lg">Scheduled</h3>
                         {acceptedTutorEvents.length === 0 ? (
-                            <p>No accepted events.</p>
+                            <p>No scheduled events.</p>
                         ) : (
                             <ul className="space-y-4">
                                 {acceptedTutorEvents.map((event) => (
