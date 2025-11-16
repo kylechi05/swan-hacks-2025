@@ -20,7 +20,7 @@ def accept_tutor(eventid, userid_tutor):
         if not tutor_info:
             raise ValueError(f"Tutor {userid_tutor} not found in possible tutors for event {eventid}")
         # Set the accepted tutor
-        event.accepted_tutor = json.dumps(tutor_info)
+        event.userid_tutor = json.dumps(tutor_info)
         event.is_accepted = True
 
         db.flush()
