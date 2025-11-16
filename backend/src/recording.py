@@ -71,6 +71,14 @@ class MediaRecorderSession:
             if self.pc.connectionState in ["failed", "closed"]:
                 await self.stop()
         
+        @self.pc.on("iceconnectionstatechange")
+        async def on_iceconnectionstatechange():
+            logger.info(f"ICE connection state for {self.participant_id}: {self.pc.iceConnectionState}")
+        
+        @self.pc.on("icegatheringstatechange")
+        async def on_icegatheringstatechange():
+            logger.info(f"ICE gathering state for {self.participant_id}: {self.pc.iceGatheringState}")
+        
         logger.info(f"Recording session initialized for participant {self.participant_id}")
     
     async def _start_recording(self):
@@ -153,7 +161,13 @@ class MediaRecorderSession:
         
         if self.pc:
             try:
-                await self.pc.close()
+                # Check if we're in an active event loop
+                try:
+                    asyncio.get_running_loop()
+                    await self.pc.close()
+                except RuntimeError:
+                    # Event loop is closed, best effort cleanup
+                    logger.warning(f"Event loop closed while stopping peer connection for {self.participant_id}")
             except Exception as e:
                 logger.error(f"Error closing peer connection: {e}", exc_info=True)
 

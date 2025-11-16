@@ -51,14 +51,26 @@ meeting_rooms = {}
 # Map session IDs to room IDs
 sid_to_room = {}
 
+# Create persistent event loop for async operations
+import threading
+_loop = None
+_loop_thread = None
+
+def get_event_loop():
+    """Get or create the persistent event loop."""
+    global _loop, _loop_thread
+    if _loop is None:
+        _loop = asyncio.new_event_loop()
+        _loop_thread = threading.Thread(target=_loop.run_forever, daemon=True)
+        _loop_thread.start()
+    return _loop
+
 # Helper function to run async code in sync context
 def run_async(coro):
-    """Run async coroutine in sync context."""
-    loop = asyncio.new_event_loop()
-    try:
-        return loop.run_until_complete(coro)
-    finally:
-        loop.close()
+    """Run async coroutine in sync context using persistent event loop."""
+    loop = get_event_loop()
+    future = asyncio.run_coroutine_threadsafe(coro, loop)
+    return future.result(timeout=30)
 
 @app.route('/')
 def index():
