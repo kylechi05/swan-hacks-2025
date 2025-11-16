@@ -23,3 +23,23 @@
   --off-white: #e8e8e8;
 
 }
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: #10b981; /* green */
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid white;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: #10b981;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid white;
+}

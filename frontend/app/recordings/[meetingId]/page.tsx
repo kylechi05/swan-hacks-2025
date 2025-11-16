@@ -51,17 +51,17 @@ export default function SyncedRecordingPage() {
         const fetchRecordings = async () => {
             try {
                 const response = await fetch(
-                    `https://api.tutorl.ink/api/recordings/meeting/${meetingId}`
+                    `https://api.tutorl.ink/api/recordings/meeting/${meetingId}`,
                 );
                 if (!response.ok) throw new Error("Failed to fetch recordings");
 
                 const data = await response.json();
                 setRecordings(data.recordings);
-                
+
                 // Also fetch transcripts
                 try {
                     const transcriptResponse = await fetch(
-                        `https://api.tutorl.ink/api/transcripts/meeting/${meetingId}`
+                        `https://api.tutorl.ink/api/transcripts/meeting/${meetingId}`,
                     );
                     if (transcriptResponse.ok) {
                         const transcriptData = await transcriptResponse.json();
@@ -70,7 +70,7 @@ export default function SyncedRecordingPage() {
                 } catch (err) {
                     console.log("No transcripts available yet");
                 }
-                
+
                 setLoading(false);
             } catch (err) {
                 setError(err instanceof Error ? err.message : "Unknown error");
@@ -90,7 +90,9 @@ export default function SyncedRecordingPage() {
 
         // Set max duration
         const handleLoadedMetadata = () => {
-            const maxDuration = Math.max(...videos.map((v) => v?.duration || 0));
+            const maxDuration = Math.max(
+                ...videos.map((v) => v?.duration || 0),
+            );
             setDuration(maxDuration);
         };
 
@@ -102,7 +104,7 @@ export default function SyncedRecordingPage() {
             videos.forEach((video) => {
                 video?.removeEventListener(
                     "loadedmetadata",
-                    handleLoadedMetadata
+                    handleLoadedMetadata,
                 );
             });
         };
@@ -110,17 +112,16 @@ export default function SyncedRecordingPage() {
 
     // Update current time
     useEffect(() => {
-        if (!isPlaying || videoRefs.current.length === 0) return;
-
         const interval = setInterval(() => {
             const firstVideo = videoRefs.current[0];
             if (firstVideo) {
                 setCurrentTime(firstVideo.currentTime);
+                setDuration(firstVideo.duration); // Ensure duration is always accurate
             }
         }, 100);
 
         return () => clearInterval(interval);
-    }, [isPlaying]);
+    }, []);
 
     // Check sync status periodically
     useEffect(() => {
@@ -202,7 +203,7 @@ export default function SyncedRecordingPage() {
 
         const newTime = Math.min(
             videos[0].duration || 0,
-            videos[0].currentTime + 5
+            videos[0].currentTime + 5,
         );
         videos.forEach((v) => {
             if (v) v.currentTime = newTime;
@@ -225,7 +226,8 @@ export default function SyncedRecordingPage() {
         const videos = videoRefs.current.filter((v) => v !== null);
         if (videos.length === 0 || !videos[0]) return;
 
-        const seekTime = (parseFloat(e.target.value) / 100) * (videos[0].duration || 0);
+        const seekTime =
+            (parseFloat(e.target.value) / 100) * (videos[0].duration || 0);
         videos.forEach((v) => {
             if (v) v.currentTime = seekTime;
         });
@@ -310,14 +312,14 @@ export default function SyncedRecordingPage() {
                     <div className="mb-6 flex flex-wrap gap-3">
                         <button
                             onClick={togglePlayPause}
-                            className="cursor-pointer flex items-center gap-2 rounded-lg bg-green-600 px-6 py-3 font-semibold transition hover:bg-green-500"
+                            className="flex cursor-pointer items-center gap-2 rounded-lg bg-green-600 px-6 py-3 font-semibold transition hover:bg-green-500"
                         >
                             <span>{isPlaying ? "⏸️" : "▶️"}</span>
                             <span>{isPlaying ? "Pause All" : "Play All"}</span>
                         </button>
                         <button
                             onClick={syncVideos}
-                            className="cursor-pointer flex items-center gap-2 rounded-lg bg-green-600 px-6 py-3 font-semibold transition hover:bg-green-500"
+                            className="flex cursor-pointer items-center gap-2 rounded-lg bg-green-600 px-6 py-3 font-semibold transition hover:bg-green-500"
                         >
                             🔄 Re-sync Videos
                         </button>
@@ -346,17 +348,25 @@ export default function SyncedRecordingPage() {
                         <div className="mb-2 flex justify-between text-sm text-gray-400">
                             <span>Timeline</span>
                             <span>
-                                {formatTime(currentTime)} / {formatTime(duration)}
+                                {formatTime(currentTime)} /{" "}
+                                {formatTime(duration)}
                             </span>
                         </div>
+
                         <input
                             type="range"
-                            min="0"
-                            max="100"
-                            step="0.1"
-                            value={duration > 0 ? (currentTime / duration) * 100 : 0}
-                            onChange={handleTimelineChange}
-                            className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-gray-700"
+                            min={0}
+                            max={duration}
+                            step={0.01}
+                            value={currentTime}
+                            onChange={(e) => {
+                                const seekTime = parseFloat(e.target.value);
+                                setCurrentTime(seekTime);
+                                videoRefs.current.forEach((v) => {
+                                    if (v) v.currentTime = seekTime;
+                                });
+                            }}
+                            className="h-2 w-full cursor-pointer rounded-lg bg-gray-700 accent-green-500"
                         />
                     </div>
 
@@ -378,7 +388,7 @@ export default function SyncedRecordingPage() {
                                     onChange={(e) =>
                                         handleVolumeChange(
                                             index,
-                                            parseInt(e.target.value)
+                                            parseInt(e.target.value),
                                         )
                                     }
                                     className="h-2 flex-1 cursor-pointer appearance-none rounded-lg bg-gray-700"
@@ -468,7 +478,9 @@ export default function SyncedRecordingPage() {
                                 📝 Transcripts
                             </h3>
                             <button
-                                onClick={() => setShowTranscripts(!showTranscripts)}
+                                onClick={() =>
+                                    setShowTranscripts(!showTranscripts)
+                                }
                                 className="cursor-pointer rounded-lg bg-green-600 px-4 py-2 font-semibold transition hover:bg-green-500"
                             >
                                 {showTranscripts ? "Hide" : "Show"}
@@ -486,21 +498,24 @@ export default function SyncedRecordingPage() {
                                             <h4 className="text-lg font-semibold text-green-300">
                                                 Participant {index + 1}
                                             </h4>
-                                            <div className="text-sm text-(--light-gray))">
-                                                {transcript.word_count} words | {transcript.language}
+                                            <div className="text-(--light-gray)) text-sm">
+                                                {transcript.word_count} words |{" "}
+                                                {transcript.language}
                                             </div>
                                         </div>
-                                        <p className="leading-relaxed text-(--light-gray))">
-                                            {transcript.transcript || "Transcription in progress..."}
+                                        <p className="text-(--light-gray)) leading-relaxed">
+                                            {transcript.transcript ||
+                                                "Transcription in progress..."}
                                         </p>
                                     </div>
                                 ))}
                             </div>
                         )}
-                        
+
                         {transcripts.length === 0 && (
                             <p className="text-center text-(--light-gray)">
-                                Transcripts are being generated... This may take a few minutes.
+                                Transcripts are being generated... This may take
+                                a few minutes.
                             </p>
                         )}
                     </div>
