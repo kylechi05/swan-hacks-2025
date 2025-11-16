@@ -310,10 +310,11 @@ def get_subjects():
 
 @app.route('/recordings')
 def recordings_list():
-    """Display list of all recordings"""
+    """Display list of all recordings grouped by meeting"""
     try:
         recordings_dir = meeting_recorder.get_recordings_dir()
         recordings = []
+        meetings = {}  # Group by meeting_id
         
         if os.path.exists(recordings_dir):
             for filename in sorted(os.listdir(recordings_dir), reverse=True):
@@ -327,19 +328,62 @@ def recordings_list():
                     participant_id = parts[1] if len(parts) > 1 else 'Unknown'
                     timestamp = '_'.join(parts[2:]) if len(parts) > 2 else 'Unknown'
                     
-                    recordings.append({
+                    recording_data = {
                         'filename': filename,
                         'meeting_id': meeting_id,
                         'participant_id': participant_id,
                         'timestamp': timestamp,
                         'size': f"{stat.st_size / (1024*1024):.2f} MB",
                         'created': datetime.fromtimestamp(stat.st_ctime).strftime('%Y-%m-%d %H:%M:%S')
-                    })
+                    }
+                    recordings.append(recording_data)
+                    
+                    # Group by meeting
+                    if meeting_id not in meetings:
+                        meetings[meeting_id] = []
+                    meetings[meeting_id].append(recording_data)
         
-        return render_template('recordings.html', recordings=recordings)
+        return render_template('recordings.html', recordings=recordings, meetings=meetings)
     except Exception as e:
         logger.error(f"Error listing recordings: {e}", exc_info=True)
         return f"Error listing recordings: {e}", 500
+
+
+@app.route('/recordings/meeting/<meeting_id>')
+def meeting_recordings(meeting_id):
+    """Display synced playback for a specific meeting"""
+    try:
+        recordings_dir = meeting_recorder.get_recordings_dir()
+        meeting_recordings = []
+        
+        if os.path.exists(recordings_dir):
+            for filename in os.listdir(recordings_dir):
+                if filename.endswith('.mp4') and filename.startswith(meeting_id + '_'):
+                    filepath = os.path.join(recordings_dir, filename)
+                    stat = os.stat(filepath)
+                    
+                    # Parse filename
+                    parts = filename.replace('.mp4', '').split('_')
+                    participant_id = parts[1] if len(parts) > 1 else 'Unknown'
+                    timestamp = '_'.join(parts[2:]) if len(parts) > 2 else 'Unknown'
+                    
+                    meeting_recordings.append({
+                        'filename': filename,
+                        'participant_id': participant_id,
+                        'timestamp': timestamp,
+                        'size': f"{stat.st_size / (1024*1024):.2f} MB",
+                        'created': datetime.fromtimestamp(stat.st_ctime).strftime('%Y-%m-%d %H:%M:%S')
+                    })
+        
+        if not meeting_recordings:
+            return "No recordings found for this meeting", 404
+            
+        return render_template('meeting_playback.html', 
+                             meeting_id=meeting_id, 
+                             recordings=meeting_recordings)
+    except Exception as e:
+        logger.error(f"Error loading meeting recordings: {e}", exc_info=True)
+        return f"Error loading meeting recordings: {e}", 500
 
 
 @app.route('/recordings/<filename>')
@@ -351,6 +395,40 @@ def serve_recording(filename):
     except Exception as e:
         logger.error(f"Error serving recording: {e}", exc_info=True)
         return f"Recording not found: {e}", 404
+
+
+@app.route('/api/recordings/meeting/<meeting_id>')
+def api_meeting_recordings(meeting_id):
+    """API endpoint to get recordings for a specific meeting"""
+    try:
+        recordings_dir = meeting_recorder.get_recordings_dir()
+        meeting_recordings = []
+        
+        if os.path.exists(recordings_dir):
+            for filename in os.listdir(recordings_dir):
+                if filename.endswith('.mp4') and filename.startswith(meeting_id + '_'):
+                    filepath = os.path.join(recordings_dir, filename)
+                    stat = os.stat(filepath)
+                    
+                    # Parse filename
+                    parts = filename.replace('.mp4', '').split('_')
+                    participant_id = parts[1] if len(parts) > 1 else 'Unknown'
+                    timestamp = '_'.join(parts[2:]) if len(parts) > 2 else 'Unknown'
+                    
+                    meeting_recordings.append({
+                        'filename': filename,
+                        'url': f'/recordings/{filename}',
+                        'participant_id': participant_id,
+                        'timestamp': timestamp,
+                        'size': stat.st_size,
+                        'size_mb': f"{stat.st_size / (1024*1024):.2f}",
+                        'created': datetime.fromtimestamp(stat.st_ctime).isoformat()
+                    })
+        
+        return {'meeting_id': meeting_id, 'recordings': meeting_recordings}, 200
+    except Exception as e:
+        logger.error(f"Error fetching meeting recordings: {e}", exc_info=True)
+        return {'error': str(e)}, 500
 
 
 @app.route('/event/create', methods=['POST'])

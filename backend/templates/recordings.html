@@ -233,37 +233,44 @@
         <h1>📹 Meeting Recordings</h1>
         
         <div class="stats">
-            <h2>Total Recordings: {{ recordings|length }}</h2>
+            <h2>Total Meetings: {{ meetings|length }} | Total Recordings: {{ recordings|length }}</h2>
             <button class="refresh-btn" onclick="location.reload()">🔄 Refresh</button>
         </div>
 
         {% if recordings %}
         <div class="recordings-grid">
-            {% for recording in recordings %}
+            {% for meeting_id, meeting_recs in meetings.items() %}
             <div class="recording-card">
                 <div class="recording-header">
-                    <h3>{{ recording.timestamp }}</h3>
-                    <div class="meeting-id">Meeting #{{ recording.meeting_id }}</div>
+                    <h3>Meeting #{{ meeting_id[:8] }}</h3>
+                    <div class="meeting-id">{{ meeting_recs|length }} Participant(s)</div>
                 </div>
                 
                 <div class="recording-info">
                     <div class="info-row">
-                        <span class="info-label">Participant:</span>
-                        <span class="info-value">{{ recording.participant_id[:12] }}...</span>
-                    </div>
-                    <div class="info-row">
                         <span class="info-label">Created:</span>
-                        <span class="info-value">{{ recording.created }}</span>
+                        <span class="info-value">{{ meeting_recs[0].created }}</span>
                     </div>
                     <div class="info-row">
-                        <span class="info-label">Size:</span>
-                        <span class="info-value">{{ recording.size }}</span>
+                        <span class="info-label">Duration:</span>
+                        <span class="info-value">{{ meeting_recs[0].timestamp }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Total Size:</span>
+                        <span class="info-value">{{ "%.2f"|format(meeting_recs|sum(attribute='size')|float) }} MB</span>
                     </div>
                 </div>
 
                 <div class="recording-actions">
-                    <button class="btn btn-play" onclick="playVideo('{{ recording.filename }}')">▶️ Play</button>
-                    <a href="/recordings/{{ recording.filename }}" download class="btn btn-download">⬇️ Download</a>
+                    {% if meeting_recs|length > 1 %}
+                    <a href="/recordings/meeting/{{ meeting_id }}" class="btn btn-play">🎬 View Synced</a>
+                    {% else %}
+                    <button class="btn btn-play" onclick="playVideo('{{ meeting_recs[0].filename }}')">▶️ Play</button>
+                    {% endif %}
+                    
+                    {% for rec in meeting_recs %}
+                    <a href="/recordings/{{ rec.filename }}" download class="btn btn-download" title="Download {{ rec.participant_id[:8] }}">⬇️</a>
+                    {% endfor %}
                 </div>
             </div>
             {% endfor %}
