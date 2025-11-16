@@ -2,3 +2,8 @@
 playground.ipynb
 __pycache__
 zzArchive
+
+# Recording files - don't commit recordings to git
+backend/recordings/*.mp4
+backend/recordings/*.webm
+backend/recordings/*.mkv

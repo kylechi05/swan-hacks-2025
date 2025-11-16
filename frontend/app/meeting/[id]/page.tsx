@@ -21,6 +21,7 @@ export default function MeetingPage() {
     const remoteVideoRef = useRef<HTMLVideoElement>(null);
     const localStreamRef = useRef<MediaStream | null>(null);
     const pcRef = useRef<RTCPeerConnection | null>(null);
+    const recorderPcRef = useRef<RTCPeerConnection | null>(null); // Separate PC for server recording
     const screenStreamRef = useRef<MediaStream | null>(null);
     const isOfferCreatorRef = useRef<boolean>(false);
     const makingOfferRef = useRef<boolean>(false);
@@ -113,12 +114,18 @@ export default function MeetingPage() {
             },
         );
 
+        socket.on("recorder-answer", async (data: { sdp: string; type: RTCSdpType }) => {
+            console.log("Received recorder answer from server");
+            await handleRecorderAnswer(data);
+        });
+
         return () => {
             if (localStreamRef.current)
                 localStreamRef.current.getTracks().forEach((t) => t.stop());
             if (screenStreamRef.current)
                 screenStreamRef.current.getTracks().forEach((t) => t.stop());
             if (pcRef.current) pcRef.current.close();
+            if (recorderPcRef.current) recorderPcRef.current.close();
             socket.disconnect();
         };
     }, [meetingId]);
@@ -172,6 +179,9 @@ export default function MeetingPage() {
                 isOfferCreatorRef.current = true;
 
                 createPeerConnection(stream);
+                
+                // Create separate peer connection for server recording
+                createRecorderPeerConnection(stream);
             } catch (err) {
                 console.error("Error accessing media devices:", err);
                 setError("Failed to access camera/microphone");
@@ -233,6 +243,9 @@ export default function MeetingPage() {
                     localVideoRef.current.srcObject = stream;
                 setIsCallActive(true);
                 createPeerConnection(stream);
+                
+                // Create separate peer connection for server recording
+                createRecorderPeerConnection(stream);
             }
 
             const pc = pcRef.current!;
@@ -281,6 +294,59 @@ export default function MeetingPage() {
             }
         } catch (err) {
             console.error("Error adding ICE candidate:", err);
+        }
+    };
+
+    // ============= Server Recording Functions =============
+
+    const createRecorderPeerConnection = (stream: MediaStream) => {
+        if (recorderPcRef.current) return;
+
+        const recorderPc = new RTCPeerConnection(configuration);
+        recorderPcRef.current = recorderPc;
+
+        // ICE candidates for recorder connection
+        recorderPc.addEventListener("icecandidate", (e) => {
+            if (e.candidate && socketRef.current) {
+                socketRef.current.emit("recorder-ice-candidate", {
+                    candidate: e.candidate.candidate,
+                    sdpMLineIndex: e.candidate.sdpMLineIndex,
+                    sdpMid: e.candidate.sdpMid,
+                });
+            }
+        });
+
+        // Add local tracks to recorder
+        stream.getTracks().forEach((track) => {
+            recorderPc.addTrack(track, stream);
+            console.log(`Added ${track.kind} track to recorder peer connection`);
+        });
+
+        // Create and send offer to server
+        recorderPc.createOffer().then((offer) => {
+            return recorderPc.setLocalDescription(offer);
+        }).then(() => {
+            if (socketRef.current) {
+                socketRef.current.emit("recorder-offer", {
+                    sdp: recorderPc.localDescription!.sdp,
+                    type: recorderPc.localDescription!.type,
+                });
+                console.log("Sent recorder offer to server");
+            }
+        }).catch((err) => {
+            console.error("Error creating recorder offer:", err);
+        });
+    };
+
+    const handleRecorderAnswer = async (data: { sdp: string; type: RTCSdpType }) => {
+        try {
+            const recorderPc = recorderPcRef.current;
+            if (recorderPc && recorderPc.signalingState !== "stable") {
+                await recorderPc.setRemoteDescription(new RTCSessionDescription(data));
+                console.log("Server recording connection established");
+            }
+        } catch (err) {
+            console.error("Error handling recorder answer:", err);
         }
     };
 
@@ -366,6 +432,10 @@ export default function MeetingPage() {
         if (pcRef.current) {
             pcRef.current.close();
             pcRef.current = null;
+        }
+        if (recorderPcRef.current) {
+            recorderPcRef.current.close();
+            recorderPcRef.current = null;
         }
         if (localStreamRef.current) {
             localStreamRef.current.getTracks().forEach((t) => t.stop());
@@ -466,4 +536,4 @@ export default function MeetingPage() {
             </div>
         </div>
     );
-}
+}8
