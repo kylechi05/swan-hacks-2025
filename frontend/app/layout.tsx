@@ -3,6 +3,8 @@ import { Montserrat } from "next/font/google";
 import "./globals.css";
 
 import { NavBar } from "./components/NavBar";
+import { AuthProvider } from "./authContext";
+
 
 const montserrat = Montserrat({
     subsets: ["latin"],
@@ -22,10 +24,12 @@ export default function RootLayout({
     return (
         <html lang="en">
             <body
-                className={`${montserrat.variable} font-montserrat antialiased bg-(--background)`}
+                className={`${montserrat.variable} font-montserrat antialiased bg-(--background) relative`}
             >
-                <NavBar />
-                {children}
+                <AuthProvider>
+                    <NavBar />
+                    {children}
+                </AuthProvider>
             </body>
         </html>
     );

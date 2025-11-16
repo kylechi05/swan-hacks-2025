@@ -11,7 +11,7 @@ export function SignUp() {
 
     const [error, setError] = useState("");
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
 
         if (form.password !== form.confirmPassword) {
@@ -21,14 +21,41 @@ export function SignUp() {
 
         setError(""); // clear errors if successful
         console.log("Sign-up data:", form);
-        // TODO: send to server/action
+
+        try {
+            const res = await fetch("http://localhost:6969/signup", {
+                method: "POST", // POST request
+                headers: {
+                    "Content-Type": "application/json", // tell server it's JSON
+                },
+                body: JSON.stringify({
+                    name: form.name,
+                    email: form.email,
+                    password: form.password,
+                }),
+            });
+
+            if (!res.ok) {
+                // If server returned an error
+                const errorData = await res.json();
+                setError(errorData.message || "Something went wrong.");
+                return;
+            }
+
+            const data = await res.json();
+            console.log("Server response:", data);
+            console.log(data)
+        } catch (err) {
+            console.error("Request failed:", err);
+            setError("Failed to connect to server.");
+        }
     };
 
     return (
-        <div className="flex flex-col items-center w-full">
+        <div className="flex w-full flex-col items-center">
             <form
                 onSubmit={handleSubmit}
-                className="flex flex-col gap-4 w-full max-w-sm"
+                className="flex w-full max-w-sm flex-col gap-4"
             >
                 <input
                     type="text"
@@ -37,7 +64,7 @@ export function SignUp() {
                     onChange={(e) =>
                         setForm((f) => ({ ...f, name: e.target.value }))
                     }
-                    className="border p-2 rounded w-full"
+                    className="rounded-lg border border-(--primary-border-color) p-2"
                     required
                 />
 
@@ -48,7 +75,7 @@ export function SignUp() {
                     onChange={(e) =>
                         setForm((f) => ({ ...f, email: e.target.value }))
                     }
-                    className="border p-2 rounded w-full"
+                    className="rounded-lg border border-(--primary-border-color) p-2"
                     required
                 />
 
@@ -59,7 +86,7 @@ export function SignUp() {
                     onChange={(e) =>
                         setForm((f) => ({ ...f, password: e.target.value }))
                     }
-                    className="border p-2 rounded w-full"
+                    className="rounded-lg border border-(--primary-border-color) p-2"
                     required
                 />
 
@@ -68,19 +95,26 @@ export function SignUp() {
                     placeholder="Confirm Password"
                     value={form.confirmPassword}
                     onChange={(e) =>
-                        setForm((f) => ({ ...f, confirmPassword: e.target.value }))
+                        setForm((f) => ({
+                            ...f,
+                            confirmPassword: e.target.value,
+                        }))
                     }
-                    className="border p-2 rounded w-full"
+                    className="rounded-lg border border-(--primary-border-color) p-2"
                     required
                 />
 
                 {error && (
-                    <p className="text-red-500 text-sm font-medium">{error}</p>
+                    <p className="text-sm font-medium text-red-500">{error}</p>
                 )}
 
                 <button
                     type="submit"
+<<<<<<< HEAD
                     className="transition-all cursor-pointer rounded hover:bg-blue-900 bg-blue-900 px-4 py-2 text-white hover:scale-105"
+=======
+                    className="cursor-pointer rounded-lg bg-blue-500 px-4 py-2 text-white transition-all hover:scale-105 hover:bg-blue-600"
+>>>>>>> d4363290b27cc99ca2010d755d1440f7b5bc1786
                 >
                     Create Account
                 </button>
