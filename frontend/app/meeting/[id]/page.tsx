@@ -512,6 +512,9 @@ export default function MeetingPage() {
                         });
                         console.log("[Screen Share] Replacing video track with screen share");
 
+                        // Store the original camera track before replacing
+                        const originalCameraTrack = videoSender.track;
+                        
                         // Replace the track
                         await videoSender.replaceTrack(screenTrack);
                         console.log("[Screen Share] Track replaced. New track:", {
@@ -520,9 +523,20 @@ export default function MeetingPage() {
                             label: screenTrack.label
                         });
 
+                        // Verify the track was actually replaced
+                        const currentTrack = videoSender.track;
+                        console.log("[Screen Share] Current track in sender after replace:", {
+                            id: currentTrack?.id,
+                            label: currentTrack?.label,
+                            enabled: currentTrack?.enabled,
+                            readyState: currentTrack?.readyState
+                        });
+
                         // For PC1, manually trigger renegotiation since replaceTrack doesn't always fire negotiationneeded
                         if (pc1Ref.current) {
                             console.log("[Screen Share] PC1 detected - manually triggering renegotiation");
+                            // Small delay to ensure track is fully replaced in the connection
+                            await new Promise(resolve => setTimeout(resolve, 100));
                             await runOfferAnswer(pc1Ref.current);
                         } else {
                             console.log("[Screen Share] PC2 detected - negotiationneeded should handle on remote peer");
@@ -555,6 +569,8 @@ export default function MeetingPage() {
                                 // For PC1, manually trigger renegotiation when switching back
                                 if (pc1Ref.current) {
                                     console.log("[Screen Share] PC1 detected - manually triggering renegotiation to switch back to camera");
+                                    // Small delay to ensure track is fully replaced
+                                    await new Promise(resolve => setTimeout(resolve, 100));
                                     await runOfferAnswer(pc1Ref.current);
                                 } else {
                                     console.log("[Screen Share] PC2 detected - negotiationneeded should handle on remote peer");
