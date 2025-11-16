@@ -29,7 +29,6 @@ socket.on('offer', async function(data) {
   
   if (!pc2) {
     // Create pc2 when we receive an offer from remote peer
-    const configuration = {};
     pc2 = new RTCPeerConnection(configuration);
     console.log('Created remote peer connection object pc2');
     pc2.addEventListener('icecandidate', e => onIceCandidate(pc2, e));
@@ -151,6 +150,18 @@ const offerOptions = {
   offerToReceiveVideo: 1
 };
 
+// ICE server configuration with public STUN servers
+const configuration = {
+  iceServers: [
+    {
+      urls: 'stun:stun.l.google.com:19302'
+    },
+    {
+      urls: 'stun:stun1.l.google.com:19302'
+    }
+  ]
+};
+
 function getName(pc) {
   return (pc === pc1) ? 'pc1' : 'pc2';
 }
@@ -184,7 +195,6 @@ async function start() {
     console.log('Starting call');
     startTime = window.performance.now();
     
-    const configuration = {};
     console.log('RTCPeerConnection configuration:', configuration);
     pc1 = new RTCPeerConnection(configuration);
     console.log('Created local peer connection object pc1');
