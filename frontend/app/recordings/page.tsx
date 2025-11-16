@@ -64,8 +64,8 @@ export default function RecordingsListPage() {
                     throw new Error("Failed to fetch recordings");
                 const recordingsData = await recordingsRes.json();
 
-                const filteredMeetings = recordingsData.filter((meeting: any) =>
-                    true
+                const filteredMeetings = recordingsData.filter(
+                    (meeting: any) => true,
                     //eventIDs.includes(Number(meeting.meeting_id)),
                 );
 
@@ -100,6 +100,30 @@ export default function RecordingsListPage() {
             </div>
 
             <div className="mx-auto max-w-7xl p-6">
+                {/* Info Card */}
+                <div className="my-8 rounded-xl border-2 border-green-600 bg-green-900/20 py-5 px-8">
+                    <h3 className="mb-3 text-xl font-bold text-green-400">
+                        ℹ️ About Recordings
+                    </h3>
+                    <div className="space-y-1 text-gray-300">
+                        <p>
+                            • Each meeting is automatically recorded from both
+                            participants&apos; perspectives
+                        </p>
+                        <p>
+                            • Click &quot;View Synced&quot; to watch both videos
+                            side-by-side in perfect sync
+                        </p>
+                        <p>
+                            • Download individual recordings using the download
+                            buttons
+                        </p>
+                        <p>
+                            • Recordings are stored securely and only accessible
+                            to meeting participants
+                        </p>
+                    </div>
+                </div>
                 {loading ? (
                     <div className="flex min-h-[400px] items-center justify-center">
                         <div className="text-center">
@@ -206,31 +230,6 @@ export default function RecordingsListPage() {
                         ))}
                     </div>
                 )}
-
-                {/* Info Card */}
-                <div className="mt-8 rounded-xl border-2 border-green-600 bg-green-900/20 p-6">
-                    <h3 className="mb-4 text-xl font-bold text-green-400">
-                        ℹ️ About Recordings
-                    </h3>
-                    <div className="space-y-2 text-gray-300">
-                        <p>
-                            • Each meeting is automatically recorded from both
-                            participants&apos; perspectives
-                        </p>
-                        <p>
-                            • Click &quot;View Synced&quot; to watch both videos
-                            side-by-side in perfect sync
-                        </p>
-                        <p>
-                            • Download individual recordings using the download
-                            buttons
-                        </p>
-                        <p>
-                            • Recordings are stored securely and only accessible
-                            to meeting participants
-                        </p>
-                    </div>
-                </div>
             </div>
         </div>
     );
