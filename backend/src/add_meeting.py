@@ -1,5 +1,6 @@
 from src.models import Meeting
 from src.database import get_db
+import datetime
 
 def add_meeting(eventid, start, end):
     """
@@ -13,8 +14,8 @@ def add_meeting(eventid, start, end):
     with get_db() as db:
         meeting = Meeting(
             eventid=eventid,
-            start_time=start,
-            end_time=end
+            start_time=datetime.fromtimestamp(start),
+            end_time=datetime.fromtimestamp(end)
         )
         db.add(meeting)
         db.flush()
