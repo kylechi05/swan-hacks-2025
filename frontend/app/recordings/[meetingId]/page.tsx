@@ -272,9 +272,9 @@ export default function SyncedRecordingPage() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-900 text-white">
+        <div className="min-h-screen text-(--off-white)">
             {/* Header */}
-            <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-6 shadow-lg">
+            <div className="bg-gradient-to-r from-green-600 to-blue-600 p-6 shadow-lg">
                 <div className="mx-auto flex max-w-7xl items-center justify-between">
                     <h1 className="text-3xl font-bold">
                         🎬 Synced Meeting Playback
@@ -292,7 +292,7 @@ export default function SyncedRecordingPage() {
                 {/* Controls Panel */}
                 <div className="mb-6 rounded-xl bg-gray-800 p-6 shadow-xl">
                     <div className="mb-6 flex items-center justify-between">
-                        <h2 className="text-2xl font-bold text-purple-400">
+                        <h2 className="text-2xl font-bold text-green-400">
                             Playback Controls
                         </h2>
                         <div
@@ -310,32 +310,32 @@ export default function SyncedRecordingPage() {
                     <div className="mb-6 flex flex-wrap gap-3">
                         <button
                             onClick={togglePlayPause}
-                            className="flex items-center gap-2 rounded-lg bg-purple-600 px-6 py-3 font-semibold transition hover:bg-purple-700"
+                            className="cursor-pointer flex items-center gap-2 rounded-lg bg-green-600 px-6 py-3 font-semibold transition hover:bg-green-500"
                         >
                             <span>{isPlaying ? "⏸️" : "▶️"}</span>
                             <span>{isPlaying ? "Pause All" : "Play All"}</span>
                         </button>
                         <button
                             onClick={syncVideos}
-                            className="flex items-center gap-2 rounded-lg bg-green-600 px-6 py-3 font-semibold transition hover:bg-green-700"
+                            className="cursor-pointer flex items-center gap-2 rounded-lg bg-green-600 px-6 py-3 font-semibold transition hover:bg-green-500"
                         >
                             🔄 Re-sync Videos
                         </button>
                         <button
                             onClick={skipBackward}
-                            className="rounded-lg bg-gray-700 px-6 py-3 font-semibold transition hover:bg-gray-600"
+                            className="cursor-pointer rounded-lg bg-gray-700 px-6 py-3 font-semibold transition hover:bg-gray-600"
                         >
                             ⏪ -5s
                         </button>
                         <button
                             onClick={skipForward}
-                            className="rounded-lg bg-gray-700 px-6 py-3 font-semibold transition hover:bg-gray-600"
+                            className="cursor-pointer rounded-lg bg-gray-700 px-6 py-3 font-semibold transition hover:bg-gray-600"
                         >
                             ⏩ +5s
                         </button>
                         <button
                             onClick={resetVideos}
-                            className="rounded-lg bg-red-600 px-6 py-3 font-semibold transition hover:bg-red-700"
+                            className="cursor-pointer rounded-lg bg-red-600 px-6 py-3 font-semibold transition hover:bg-red-700"
                         >
                             ⏮️ Reset
                         </button>
@@ -417,41 +417,41 @@ export default function SyncedRecordingPage() {
                 </div>
 
                 {/* Info Panel */}
-                <div className="mt-6 rounded-xl border-2 border-purple-600 bg-purple-900/20 p-6">
-                    <h3 className="mb-4 text-xl font-bold text-purple-400">
+                <div className="mt-6 rounded-xl border-2 border-green-600 bg-green-900/20 p-6">
+                    <h3 className="mb-4 text-xl font-bold text-green-400">
                         💡 Synced Playback Tips
                     </h3>
                     <ul className="space-y-2 text-gray-300">
                         <li className="flex items-start gap-2">
-                            <span className="text-purple-400">•</span>
+                            <span className="text-green-400">•</span>
                             <span>
                                 Videos are automatically synchronized when you
                                 press play
                             </span>
                         </li>
                         <li className="flex items-start gap-2">
-                            <span className="text-purple-400">•</span>
+                            <span className="text-green-400">•</span>
                             <span>
                                 Use the timeline to seek to any point in the
                                 meeting
                             </span>
                         </li>
                         <li className="flex items-start gap-2">
-                            <span className="text-purple-400">•</span>
+                            <span className="text-green-400">•</span>
                             <span>
                                 Adjust individual participant volumes with the
                                 sliders
                             </span>
                         </li>
                         <li className="flex items-start gap-2">
-                            <span className="text-purple-400">•</span>
+                            <span className="text-green-400">•</span>
                             <span>
                                 If videos go out of sync, click "Re-sync Videos"
                                 to realign them
                             </span>
                         </li>
                         <li className="flex items-start gap-2">
-                            <span className="text-purple-400">•</span>
+                            <span className="text-green-400">•</span>
                             <span>
                                 Keyboard shortcuts: Space (play/pause), ← (back
                                 5s), → (forward 5s)
@@ -464,12 +464,12 @@ export default function SyncedRecordingPage() {
                 {transcripts.length > 0 && (
                     <div className="mt-6 rounded-xl bg-gray-800 p-6 shadow-xl">
                         <div className="mb-4 flex items-center justify-between">
-                            <h3 className="text-2xl font-bold text-purple-400">
+                            <h3 className="text-2xl font-bold text-green-400">
                                 📝 Transcripts
                             </h3>
                             <button
                                 onClick={() => setShowTranscripts(!showTranscripts)}
-                                className="rounded-lg bg-purple-600 px-4 py-2 font-semibold transition hover:bg-purple-700"
+                                className="cursor-pointer rounded-lg bg-green-600 px-4 py-2 font-semibold transition hover:bg-green-500"
                             >
                                 {showTranscripts ? "Hide" : "Show"}
                             </button>
@@ -483,14 +483,14 @@ export default function SyncedRecordingPage() {
                                         className="rounded-lg border border-gray-700 bg-gray-900 p-4"
                                     >
                                         <div className="mb-3 flex items-center justify-between">
-                                            <h4 className="text-lg font-semibold text-purple-300">
+                                            <h4 className="text-lg font-semibold text-green-300">
                                                 Participant {index + 1}
                                             </h4>
-                                            <div className="text-sm text-gray-400">
+                                            <div className="text-sm text-(--light-gray))">
                                                 {transcript.word_count} words | {transcript.language}
                                             </div>
                                         </div>
-                                        <p className="leading-relaxed text-gray-300">
+                                        <p className="leading-relaxed text-(--light-gray))">
                                             {transcript.transcript || "Transcription in progress..."}
                                         </p>
                                     </div>
@@ -499,7 +499,7 @@ export default function SyncedRecordingPage() {
                         )}
                         
                         {transcripts.length === 0 && (
-                            <p className="text-center text-gray-400">
+                            <p className="text-center text-(--light-gray)">
                                 Transcripts are being generated... This may take a few minutes.
                             </p>
                         )}
