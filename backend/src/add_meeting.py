@@ -13,8 +13,8 @@ def add_meeting(eventid, start, end):
     with get_db() as db:
         meeting = Meeting(
             eventid=eventid,
-            start=start,
-            end=end
+            start_time=start,
+            end_time=end
         )
         db.add(meeting)
         db.flush()
