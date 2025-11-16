@@ -82,7 +82,7 @@ def get_subjects():
         return {'error': f'Error: {e}'}, 500
 
 
-@app.route('/create_event', methods=['POST'])
+@app.route('/event/create', methods=['POST'])
 @jwt_required()
 def post_create_event():
     try:
@@ -109,6 +109,15 @@ def post_create_event():
         import traceback
         traceback.print_exc()
         return {'error': str(e)}, 500
+
+@app.route('/event/<int:event_id>/offer', methods=['POST'])
+@jwt_required()
+def get_event_offer():
+    def generate():
+        request.json.get('eid')
+    return Response(generate(), mimetype='text/plain')
+
+@app.route('/get_events', methods=['POST'])
 
 
 if __name__ == "__main__":
