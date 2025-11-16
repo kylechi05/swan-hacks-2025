@@ -30,6 +30,13 @@ export default function MyEvents() {
     const [error, setError] = useState("");
 
     useEffect(() => {
+        fetchAllEvents();
+    }, []);
+
+    const fetchAllEvents = async () => {
+        setLoading(true);
+        setError("");
+
         const getTuteeEvents = async () => {
             try {
                 const res = await fetch("https://api.tutorl.ink/events/tutee", {
@@ -73,7 +80,6 @@ export default function MyEvents() {
 
                 const data = await res.json();
                 const events = data.events;
-                console.log(events)
 
                 setPendingTutorEvents(
                     events.filter(
@@ -85,19 +91,28 @@ export default function MyEvents() {
                 );
 
                 setAcceptedTutorEvents(
-                    events.filter(
-                        (event) => event.userid_tutor?.userid_tutor === user.userid,
-                    ),
+                    events
+                        .map((event) => ({
+                            ...event,
+                            userid_tutor:
+                                typeof event.userid_tutor === "string"
+                                    ? JSON.parse(event.userid_tutor)
+                                    : event.userid_tutor,
+                        }))
+                        .filter(
+                            (event) =>
+                                event.userid_tutor?.userid_tutor ===
+                                user.userid,
+                        ),
                 );
             } catch (err: any) {
                 setError(err.message);
             }
         };
 
-        Promise.all([getTuteeEvents(), getTutorEvents()]).finally(() =>
-            setLoading(false),
-        );
-    }, []);
+        await Promise.all([getTuteeEvents(), getTutorEvents()]);
+        setLoading(false);
+    };
 
     const handleSelectTutor = async (eventId: number, tutorId: number) => {
         try {
@@ -115,7 +130,8 @@ export default function MyEvents() {
             if (!res.ok) throw new Error("Failed to accept tutor");
 
             alert("Tutor accepted successfully!");
-            // refresh
+
+            await fetchAllEvents();
         } catch (err: any) {
             alert(err.message);
         }
@@ -126,8 +142,8 @@ export default function MyEvents() {
     if (error) return <div className="text-red-500">{error}</div>;
 
     return (
-        <div className="px-18 py-8 text-(--off-white)">
-            <h1 className="mb-6 text-2xl">My Events</h1>
+        <div className="flex flex-col gap-16 px-18 py-8 text-(--off-white)">
+            <h1 className="text-2xl">My Events</h1>
             <section className="mb-12">
                 <h2 className="mb-4 text-xl">Events I Requested</h2>
 
@@ -242,11 +258,16 @@ export default function MyEvents() {
                                     >
                                         <EventDisplay
                                             event={event}
-                                            startTime={
-                                                event.userid_tutor.start
-                                            }
+                                            startTime={event.userid_tutor.start}
                                             endTime={event.userid_tutor.end}
-                                        />
+                                        >
+                                            <a
+                                                href={`/meeting/${event.eventid}`}
+                                                className="mt-2 inline-block rounded bg-blue-600 px-4 py-2 text-white transition-all hover:bg-blue-500"
+                                            >
+                                                Join Meeting
+                                            </a>
+                                        </EventDisplay>
                                     </li>
                                 ))}
                             </ul>
@@ -254,6 +275,7 @@ export default function MyEvents() {
                     </div>
                 </div>
             </section>
+            <div className="mb-6 border-b border-(--primary-border-color)"></div>
 
             <section>
                 <h2 className="mb-4 text-xl">Events I&apos;m Tutoring</h2>
@@ -301,9 +323,16 @@ export default function MyEvents() {
                                     >
                                         <EventDisplay
                                             event={event}
-                                            startTime={tutorSlot.start}
-                                            endTime={tutorSlot.end}
-                                        />{" "}
+                                            startTime={event.userid_tutor.start}
+                                            endTime={event.userid_tutor.end}
+                                        >
+                                            <a
+                                                href={`/meeting/${event.eventid}`}
+                                                className="mt-2 inline-block rounded bg-blue-600 px-4 py-2 text-white transition-all hover:bg-blue-500"
+                                            >
+                                                Join Meeting
+                                            </a>
+                                        </EventDisplay>
                                     </li>
                                 ))}
                             </ul>
