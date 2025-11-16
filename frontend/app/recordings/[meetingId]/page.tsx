@@ -395,8 +395,8 @@ export default function SyncedRecordingPage() {
                             key={recording.filename}
                             className="overflow-hidden rounded-xl bg-gray-800 shadow-xl"
                         >
-                            <div className="border-b-2 border-purple-600 bg-gray-700 p-4">
-                                <h3 className="text-lg font-bold text-purple-400">
+                            <div className="border-b-2 border-green-600 bg-gray-700 p-4">
+                                <h3 className="text-lg font-bold text-green-400">
                                     Participant {index + 1}
                                 </h3>
                                 <p className="text-sm text-gray-400">
