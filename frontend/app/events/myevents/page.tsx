@@ -39,7 +39,6 @@ export default function MyEvents() {
 
                 const data = await res.json();
                 const events = data.events;
-                console.log("TUTEE", events)
 
                 setPendingTuteeEvents(
                     events.filter(

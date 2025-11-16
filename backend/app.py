@@ -336,7 +336,7 @@ def get_tutor_events():
     try:
         userid_tutor = int(get_jwt_identity())
         events = list_tutor_events(userid_tutor)
-        return {events}, 200
+        return {'events': events}, 200
     except Exception as e:
         print(f"Error in get_tutor_events: {e}")
         import traceback
