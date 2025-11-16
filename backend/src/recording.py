@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import Dict, Optional
 import av
 import numpy as np
-from aiortc import RTCPeerConnection, RTCSessionDescription, MediaStreamTrack
+from aiortc import RTCPeerConnection, RTCSessionDescription, MediaStreamTrack, RTCRtpReceiver
 from aiortc.contrib.media import MediaRecorder, MediaPlayer
 from av import VideoFrame, AudioFrame
 
@@ -117,11 +117,8 @@ class MediaRecorderSession:
             logger.error(f"[Recording] _start_recording called for {self.participant_id} but no tracks are available.")
             return
             
-        try:
-            # ... (rest of the function is the same, it already handles missing tracks) ...
-            
-            self.recorder = MediaRecorder(self.output_file, format="mp4")
-            
+        try:            
+            self.recorder = MediaRecorder(self.output_file.replace('.mp4', '.webm'), format='webm')            
             if self.video_track:
                 self.recorder.addTrack(self.video_track)
                 logger.info(f"[Recording] Added video track to recorder for {self.participant_id}")
@@ -152,6 +149,8 @@ class MediaRecorderSession:
             Dictionary with answer SDP
         """
         try:
+            if not self.pc:
+                raise RuntimeError("PeerConnection not initialized before handle_offer")
             # Set remote description from client's offer
             offer_desc = RTCSessionDescription(sdp=offer["sdp"], type=offer["type"])
             await self.pc.setRemoteDescription(offer_desc)
@@ -162,6 +161,22 @@ class MediaRecorderSession:
             # Log what tracks we're expecting
             for transceiver in self.pc.getTransceivers():
                 logger.info(f"Transceiver: {transceiver.kind}, direction: {transceiver.direction}")
+
+            # Option (b): Force H264 for MP4 container compatibility
+            try:
+                transceivers = self.pc.getTransceivers()
+                capabilities = RTCRtpReceiver.getCapabilities("video")
+                h264_codecs = []
+                if capabilities and getattr(capabilities, "codecs", None):
+                    h264_codecs = [c for c in capabilities.codecs if c.mimeType and c.mimeType.lower() == "video/h264"]
+                for transceiver in transceivers:
+                    if transceiver.kind == "video" and h264_codecs:
+                        transceiver.setCodecPreferences(h264_codecs)
+                        logger.info(f"[Recording] Applied H264 codec preference for participant {self.participant_id}")
+                if not h264_codecs:
+                    logger.warning(f"[Recording] No H264 codecs available to prefer for participant {self.participant_id}")
+            except Exception as codec_err:
+                logger.error(f"[Recording] Failed to set H264 codec preference: {codec_err}")
             
             # Create answer
             answer = await self.pc.createAnswer()
