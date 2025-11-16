@@ -39,7 +39,6 @@ export default function MyEvents() {
 
                 const data = await res.json();
                 const events = data.events;
-                console.log(events)
 
                 setPendingTuteeEvents(
                     events.filter(
@@ -74,6 +73,7 @@ export default function MyEvents() {
 
                 const data = await res.json();
                 const events = data.events;
+                console.log(events)
 
                 setPendingTutorEvents(
                     events.filter(
@@ -86,7 +86,7 @@ export default function MyEvents() {
 
                 setAcceptedTutorEvents(
                     events.filter(
-                        (event) => event.userid_tutor === user.userid,
+                        (event) => event.userid_tutor?.userid_tutor === user.userid,
                     ),
                 );
             } catch (err: any) {
@@ -243,9 +243,9 @@ export default function MyEvents() {
                                         <EventDisplay
                                             event={event}
                                             startTime={
-                                                event.available_start_time
+                                                event.userid_tutor.start
                                             }
-                                            endTime={event.available_end_time}
+                                            endTime={event.userid_tutor.end}
                                         />
                                     </li>
                                 ))}
