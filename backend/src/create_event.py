@@ -1,6 +1,6 @@
 from src.models import RequestedEvent
 from src.database import get_db
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 def create_event(
@@ -29,8 +29,8 @@ def create_event(
     
     with get_db() as db:
         # Convert Unix timestamps to datetime objects
-        available_start_time = datetime.fromtimestamp(available_start)
-        available_end_time = datetime.fromtimestamp(available_end)
+        available_start_time = datetime.fromtimestamp(available_start, tz=timezone.utc)
+        available_end_time = datetime.fromtimestamp(available_end, tz=timezone.utc)
         
         print(f"Converted times: start={available_start_time}, end={available_end_time}")
         
