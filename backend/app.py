@@ -545,12 +545,14 @@ def recordings_list():
         
         if os.path.exists(recordings_dir):
             for filename in sorted(os.listdir(recordings_dir), reverse=True):
-                if filename.endswith('.mp4'):
+                if filename.endswith('.mp4') or filename.endswith('.webm'):
                     filepath = os.path.join(recordings_dir, filename)
                     stat = os.stat(filepath)
                     
-                    # Parse filename: meeting_id_participant_id_timestamp.mp4
-                    parts = filename.replace('.mp4', '').split('_')
+                    # Parse filename: meeting_id_participant_id_timestamp.mp4/webm
+                    # Remove extension
+                    file_base = filename.rsplit('.', 1)[0]
+                    parts = file_base.split('_')
                     meeting_id = parts[0] if len(parts) > 0 else 'Unknown'
                     participant_id = parts[1] if len(parts) > 1 else 'Unknown'
                     timestamp = '_'.join(parts[2:]) if len(parts) > 2 else 'Unknown'
@@ -586,12 +588,13 @@ def meeting_recordings(meeting_id):
         
         if os.path.exists(recordings_dir):
             for filename in os.listdir(recordings_dir):
-                if filename.endswith('.mp4') and filename.startswith(meeting_id + '_'):
+                if (filename.endswith('.mp4') or filename.endswith('.webm')) and filename.startswith(meeting_id + '_'):
                     filepath = os.path.join(recordings_dir, filename)
                     stat = os.stat(filepath)
                     
                     # Parse filename
-                    parts = filename.replace('.mp4', '').split('_')
+                    file_base = filename.rsplit('.', 1)[0]
+                    parts = file_base.split('_')
                     participant_id = parts[1] if len(parts) > 1 else 'Unknown'
                     timestamp = '_'.join(parts[2:]) if len(parts) > 2 else 'Unknown'
                     
@@ -634,12 +637,14 @@ def api_recordings_list():
         
         if os.path.exists(recordings_dir):
             for filename in sorted(os.listdir(recordings_dir), reverse=True):
-                if filename.endswith('.mp4'):
+                if filename.endswith('.mp4') or filename.endswith('.webm'):
                     filepath = os.path.join(recordings_dir, filename)
                     stat = os.stat(filepath)
                     
-                    # Parse filename: meeting_id_participant_id_timestamp.mp4
-                    parts = filename.replace('.mp4', '').split('_')
+                    # Parse filename: meeting_id_participant_id_timestamp.mp4/webm
+                    # Remove extension
+                    file_base = filename.rsplit('.', 1)[0]
+                    parts = file_base.split('_')
                     meeting_id = parts[0] if len(parts) > 0 else 'Unknown'
                     participant_id = parts[1] if len(parts) > 1 else 'Unknown'
                     timestamp = '_'.join(parts[2:]) if len(parts) > 2 else 'Unknown'
@@ -788,12 +793,13 @@ def api_meeting_recordings(meeting_id):
         
         if os.path.exists(recordings_dir):
             for filename in os.listdir(recordings_dir):
-                if filename.endswith('.mp4') and filename.startswith(meeting_id + '_'):
+                if (filename.endswith('.mp4') or filename.endswith('.webm')) and filename.startswith(meeting_id + '_'):
                     filepath = os.path.join(recordings_dir, filename)
                     stat = os.stat(filepath)
                     
                     # Parse filename
-                    parts = filename.replace('.mp4', '').split('_')
+                    file_base = filename.rsplit('.', 1)[0]
+                    parts = file_base.split('_')
                     participant_id = parts[1] if len(parts) > 1 else 'Unknown'
                     timestamp = '_'.join(parts[2:]) if len(parts) > 2 else 'Unknown'
                     
