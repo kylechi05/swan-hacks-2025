@@ -384,6 +384,7 @@ export default function MeetingPage() {
             
             mediaRecorder.onstop = async () => {
                 console.log('Recording stopped, uploading...');
+                await new Promise(resolve => setTimeout(resolve, 500));
                 await uploadRecording();
             };
             
