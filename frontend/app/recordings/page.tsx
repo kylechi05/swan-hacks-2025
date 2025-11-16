@@ -66,8 +66,8 @@ export default function RecordingsListPage() {
                 const recordingsData = await recordingsRes.json();
 
                 const filteredMeetings = recordingsData.filter(
-                    (meeting: any) => true,
-                    //eventIDs.includes(Number(meeting.meeting_id)),
+                    (meeting: any) => 
+                    eventIDs.includes(Number(meeting.meeting_id)),
                 );
 
                 setMeetings(filteredMeetings);

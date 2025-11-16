@@ -10,7 +10,7 @@ export default function Home() {
           </h1>
           <p className="mx-auto max-w-2xl text-xl pb-5 text-green-100">
             Master any subject with personalized one-on-one tutoring.<br />
-            Learn from verified experts who care about your success.
+            Learn from experts who care about your success.
           </p>
           <div className="max-w-xs mx-auto cursor-pointer rounded-lg bg-green-700 px-4 py-2 text-center text-white transition-all hover:scale-105 hover:bg-green-600">
             <Link href="/events" className="text-2xl font-bold hover:text-white ml-auto">
