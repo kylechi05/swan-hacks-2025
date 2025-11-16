@@ -5,7 +5,6 @@ export default function EventsPage() {
         <div className="flex min-h-screen flex-col gap-16 bg-(--background) px-36 py-20 text-(--off-white)">
             <h1 className="text-center text-4xl font-semibold">Events</h1>
             <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
-                {/* Request Help Card */}
                 <div className="flex h-64 flex-col gap-4 rounded-2xl border border-(--primary-border-color) p-8">
                     <h2 className="text-2xl font-semibold">Request Help</h2>
                     <p className="text-(--light-gray)">
@@ -20,7 +19,6 @@ export default function EventsPage() {
 
                 </div>
 
-                {/* Tutor Others Card */}
                 <div className="flex h-64 flex-col gap-4 rounded-2xl border border-(--primary-border-color) p-8">
                     <h2 className="text-2xl font-semibold">Tutor Others</h2>
                     <p className="text-(--light-gray)">
@@ -34,6 +32,15 @@ export default function EventsPage() {
                         Sign Up to Tutor
                     </Link>
                 </div>
+                <div className="h-4"></div>
+
+                <Link
+                    href="/events/myevents"
+                    className="col-span-2 justify-self-center w-64 cursor-pointer rounded-lg bg-green-700 px-4 py-2 text-center text-white text-2xl font-bold transition-all hover:scale-105 hover:bg-green-600">
+                    See My Events
+                </Link>
+
+
             </div>
         </div>
     );
