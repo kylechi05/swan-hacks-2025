@@ -129,9 +129,10 @@ def get_event_offer():
         request.json.get('eid')
     return Response(generate(), mimetype='text/plain')
 
-@app.route('/get_events', methods=['POST'])
+# @app.route('/get_events', methods=['POST'])
 
 
 if __name__ == "__main__":
     socketio.run(app, debug=True, host='0.0.0.0', port=6969)
+
 

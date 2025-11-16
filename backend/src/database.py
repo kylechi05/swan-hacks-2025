@@ -1,11 +1,14 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
 from contextlib import contextmanager
-from src.models import Base
+from models import Base
 import os
 
-# Database configuration
-DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///./src/database.db')
+# Get the directory where this file is located
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Database configuration - use absolute path for SQLite
+DATABASE_URL = os.getenv('DATABASE_URL', f'sqlite:///{os.path.join(BASE_DIR, "database.db")}')
 
 # Create engine
 engine = create_engine(

@@ -3,8 +3,8 @@ Database initialization and migration script for SQLAlchemy.
 Run this to set up the database with initial data.
 """
 
-from src.database import init_db, get_db
-from src.models import User, Subject, RequestedEvent, Meeting
+from database import init_db, get_db
+from models import User, Subject, RequestedEvent, Meeting
 
 # List of subjects to populate
 INITIAL_SUBJECTS = [
@@ -59,7 +59,7 @@ def create_sample_users():
         
         sample_users = [
             User(name="Carlo Tran", email="carlotran4@gmail.com", password="1234"),
-            User(name="Kyle Chi", email="kyle@uiowa.edu", password="1234"),
+            User(name="Kyle Chi", email="kyle@uiowa.edu", password="t"),
             User(name="John Doe", email="john@example.com", password="password123"),
         ]
         

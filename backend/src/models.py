@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text, ForeignKey
+from sqlalchemy import JSON, Column, Integer, String, DateTime, Boolean, Text, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -43,7 +43,7 @@ class RequestedEvent(Base):
     title = Column(String(500), nullable=False)
     description = Column(Text)
     uid_tutor = Column(Integer, ForeignKey('user.userid'), nullable=True, index=True)
-    possible_tutors = Column(Text)  # JSON string of possible tutor IDs
+    possible_tutors = Column(JSON,nullable = True)  # JSON string of possible tutor IDs
     is_accepted = Column(Boolean, default=False)
     is_deleted = Column(Boolean, default=False)
     
