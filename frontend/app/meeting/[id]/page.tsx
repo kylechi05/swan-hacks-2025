@@ -30,7 +30,17 @@ export default function MeetingPage() {
             { urls: 'stun:stun3.l.google.com:19302' },
             { urls: 'stun:stun4.l.google.com:19302' }
         ],
-        iceCandidatePoolSize: 10
+        iceCandidatePoolSize: 10,
+        bundlePolicy: 'max-bundle',
+        iceTransportPolicy: 'all',
+    };
+
+    configuration.onicecandidate = event => {
+
+        if (event.candidate) {
+            console.log('New ICE candidate:', event.candidate);
+        }
+        signalingChannel.send(JSON.stringify({ 'new-ice-candidate': event.candidate }));
     };
 
     useEffect(() => {
