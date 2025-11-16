@@ -7,13 +7,17 @@ export default function Home() {
         <h1 className="mx-auto max-w-3xl text-5xl font-bold text-balance md:text-6xl">
           Connect with Expert Tutors Anytime, Anywhere
         </h1>
-        <p className="text-muted-foreground mx-auto max-w-2xl text-xl text-balance text-(--light-gray)">
+        <p className="text-muted-foreground mx-auto max-w-2xl text-xl pb-5 text-balance text-(--light-gray)">
           Master any subject with personalized one-on-one tutoring.
           Learn from verified experts who care about your success.
         </p>
+        <div className="max-w-xs mx-auto cursor-pointer rounded-lg bg-green-600 px-4 py-2 text-center text-white transition-all hover:scale-105 hover:bg-green-500">
+          <Link href="/events" className="text-2xl font-bold hover:text-white ml-auto">Get Started</Link>
+        </div>
+    
       </section>
 
-      <section className="bg-muted/30 space-y-8 rounded-xl p-8 md:p-8">
+      <section className="bg-muted/30 space-y-8 pt-15 rounded-xl p-8 md:p-8">
         <div className="space-y-2 text-center">
           <h2 className="text-3xl font-bold md:text-4xl">
             How It Works
@@ -56,9 +60,6 @@ export default function Home() {
             </div>
           </div>
         <div className="space-y-10"></div>
-        <div className="max-w-xs mx-auto cursor-pointer rounded-lg bg-green-600 px-4 py-2 text-center text-white transition-all hover:scale-105 hover:bg-green-500">
-          <Link href="/events" className="text-2xl font-bold hover:text-white ml-auto">Get Started</Link>
-        </div>
       </section>
     </div>
   );
