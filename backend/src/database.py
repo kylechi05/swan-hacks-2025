@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
 from contextlib import contextmanager
-from models import Base
+from src.models import Base
 import os
 
 # Get the directory where this file is located

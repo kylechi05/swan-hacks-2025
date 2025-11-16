@@ -65,7 +65,7 @@ def create_sample_users():
         
         for user in sample_users:
             db.add(user)
-        
+
         print(f"Added {len(sample_users)} sample users")
 
 
@@ -79,10 +79,12 @@ def main():
     
     # Populate subjects
     populate_subjects()
+
+
     
     # Optionally create sample users
     # Uncomment the line below to create sample users
-    # create_sample_users()
+    create_sample_users()
     
     print("\nDatabase initialization complete!")
 
