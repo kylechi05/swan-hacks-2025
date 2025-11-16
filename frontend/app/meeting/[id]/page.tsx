@@ -199,7 +199,7 @@ export default function MeetingPage() {
 
     const handleAnswer = async (data: { sdp: string; type: RTCSdpType }) => {
         try {
-            if (pc1Ref.current) {
+            if (pc1Ref.current && pc1Ref.current.signalingState !== "stable") {
                 await pc1Ref.current.setRemoteDescription(
                     new RTCSessionDescription(data),
                 );
