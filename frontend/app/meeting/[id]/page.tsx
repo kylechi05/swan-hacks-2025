@@ -10,7 +10,6 @@ export default function MeetingPage() {
     const params = useParams();
     const meetingId = params.id as string;
     const { user } = useAuth();
-    const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:6969';
 
     const [isConnected, setIsConnected] = useState(false);
     const [memberCount, setMemberCount] = useState(0);
@@ -120,6 +119,12 @@ export default function MeetingPage() {
         socket.on("user-joined", (data: { member_count: number }) => {
             console.log("Another user joined");
             setMemberCount(data.member_count);
+            
+            // Clear recorded chunks to sync recordings when someone joins
+            if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+                recordedChunksRef.current = [];
+                console.log("Cleared recording cache for sync");
+            }
         });
 
         socket.on("user-left", (data: { member_count: number }) => {
@@ -414,7 +419,7 @@ export default function MeetingPage() {
             formData.append('participant_id', (user?.userid?.toString() || socketRef.current?.id || 'unknown'));
             
             // Upload to server (configurable base URL)
-            const response = await fetch(`${API_BASE}/api/recordings/upload`, {
+            const response = await fetch(`https://api.tutorl.ink/api/recordings/upload`, {
                 method: 'POST',
                 body: formData,
             });
