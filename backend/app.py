@@ -4,7 +4,7 @@ import os
 import json
 from datetime import datetime
 from flask_socketio import SocketIO, send, emit, join_room, leave_room
-from flask import Flask, render_template, Response, request, send_from_directory
+from flask import Flask, render_template, Response, request, send_from_directory, jsonify
 from flask_cors import CORS
 from src.login import login
 from src.signup import signup
@@ -687,6 +687,51 @@ def serve_recording(filename):
     except Exception as e:
         logger.error(f"Error serving recording: {e}", exc_info=True)
         return f"Recording not found: {e}", 404
+
+
+@app.route('/api/recordings')
+def api_recordings_list():
+    """API endpoint to get all recordings grouped by meeting"""
+    try:
+        recordings_dir = meeting_recorder.get_recordings_dir()
+        meetings = {}  # Group by meeting_id
+        
+        if os.path.exists(recordings_dir):
+            for filename in sorted(os.listdir(recordings_dir), reverse=True):
+                if filename.endswith('.mp4'):
+                    filepath = os.path.join(recordings_dir, filename)
+                    stat = os.stat(filepath)
+                    
+                    # Parse filename: meeting_id_participant_id_timestamp.mp4
+                    parts = filename.replace('.mp4', '').split('_')
+                    meeting_id = parts[0] if len(parts) > 0 else 'Unknown'
+                    participant_id = parts[1] if len(parts) > 1 else 'Unknown'
+                    timestamp = '_'.join(parts[2:]) if len(parts) > 2 else 'Unknown'
+                    
+                    recording_data = {
+                        'filename': filename,
+                        'meeting_id': meeting_id,
+                        'participant_id': participant_id,
+                        'timestamp': timestamp,
+                        'size': f"{stat.st_size / (1024*1024):.2f} MB",
+                        'created': datetime.fromtimestamp(stat.st_ctime).isoformat()
+                    }
+                    
+                    # Group by meeting
+                    if meeting_id not in meetings:
+                        meetings[meeting_id] = {
+                            'meeting_id': meeting_id,
+                            'recordings': [],
+                            'created': datetime.fromtimestamp(stat.st_ctime).isoformat()
+                        }
+                    meetings[meeting_id]['recordings'].append(recording_data)
+        
+        # Convert dict to list
+        meetings_list = list(meetings.values())
+        return jsonify(meetings_list), 200
+    except Exception as e:
+        logger.error(f"Error listing recordings: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/recordings/meeting/<meeting_id>')

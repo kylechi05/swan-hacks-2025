@@ -25,9 +25,23 @@ export default function RecordingsListPage() {
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        // This would typically fetch from your API
-        // For now, we'll show how to integrate it
-        setLoading(false);
+        const fetchRecordings = async () => {
+            try {
+                const response = await fetch("https://api.tutorl.ink/api/recordings");
+                if (!response.ok) {
+                    throw new Error("Failed to fetch recordings");
+                }
+                const data = await response.json();
+                setMeetings(data);
+            } catch (err) {
+                console.error("Error fetching recordings:", err);
+                setError(err instanceof Error ? err.message : "Failed to load recordings");
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchRecordings();
     }, []);
 
     const viewSyncedRecording = (meetingId: string) => {
@@ -54,6 +68,16 @@ export default function RecordingsListPage() {
                             <p className="text-xl text-gray-300">
                                 Loading recordings...
                             </p>
+                        </div>
+                    </div>
+                ) : error ? (
+                    <div className="flex min-h-[400px] items-center justify-center">
+                        <div className="text-center">
+                            <div className="mb-4 text-6xl">⚠️</div>
+                            <h2 className="mb-2 text-2xl font-bold text-red-400">
+                                Error Loading Recordings
+                            </h2>
+                            <p className="text-gray-400">{error}</p>
                         </div>
                     </div>
                 ) : meetings.length === 0 ? (
