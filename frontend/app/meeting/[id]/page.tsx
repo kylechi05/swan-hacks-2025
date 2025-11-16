@@ -40,7 +40,7 @@ export default function MeetingPage() {
         if (event.candidate) {
             console.log('New ICE candidate:', event.candidate);
         }
-        signalingChannel.send(type: 'candidate', candidate: event.candidate);
+        signalingChannel.send(JSON.stringify({ 'new-ice-candidate': event.candidate }));
     };
 
     useEffect(() => {
