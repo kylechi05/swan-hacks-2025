@@ -359,7 +359,7 @@ def handle_join_chat(data):
                 return
             
             # Check if user is the tutor or tutee
-            is_authorized = (event.userid_tutee == userid or event.userid_tutor == userid)
+            is_authorized = (event.userid_tutee == userid or event.userid_tutor.userid_tutor == userid)
             
             if not is_authorized:
                 emit('chat-error', {'message': 'Unauthorized: You are not part of this event'})
@@ -387,7 +387,7 @@ def handle_join_chat(data):
             chat_rooms[eventid]['users'][sid] = userid
             
             # Set tutor or tutee sid
-            if event.userid_tutor == userid:
+            if event.userid_tutor.userid_tutor == userid:
                 chat_rooms[eventid]['tutor_sid'] = sid
             elif event.userid_tutee == userid:
                 chat_rooms[eventid]['tutee_sid'] = sid

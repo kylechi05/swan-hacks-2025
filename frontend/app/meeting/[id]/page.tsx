@@ -3,10 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { io, Socket } from "socket.io-client";
+import Chat from "./components/chat";
+import { useAuth } from "@/app/authContext";
 
 export default function MeetingPage() {
     const params = useParams();
     const meetingId = params.id as string;
+    const { user } = useAuth();
 
     const [isConnected, setIsConnected] = useState(false);
     const [memberCount, setMemberCount] = useState(0);
@@ -15,6 +18,7 @@ export default function MeetingPage() {
     const [error, setError] = useState<string | null>(null);
     const [shouldStartCall, setShouldStartCall] = useState(false);
     const [shouldShareScreen, setShouldShareScreen] = useState(false);
+    const [userRole, setUserRole] = useState<"tutor" | "tutee">("tutee");
 
     const socketRef = useRef<Socket | null>(null);
     const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -55,6 +59,45 @@ export default function MeetingPage() {
         bundlePolicy: "max-bundle",
         iceTransportPolicy: "all",
     };
+
+    // Fetch event details and determine user role
+    useEffect(() => {
+        const fetchEventDetails = async () => {
+            try {
+                const token = localStorage.getItem("token");
+                if (!token || !user?.userid) return;
+
+                const response = await fetch(`https://api.tutorl.ink/events`, {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log(data)
+                    const event = data.events?.find(
+                        (e: any) => e.eventid === parseInt(meetingId)
+                    );
+                    console.log(event)
+
+                    if (event) {
+                        console.log(event.userid_tutor.userid_tutor)
+                        // Determine if user is tutor or tutee
+                        if (event.userid_tutor.userid_tutor === user.userid) {
+                            setUserRole("tutor");
+                        } else if (event.userid_tutee === user.userid) {
+                            setUserRole("tutee");
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error("Error fetching event details:", error);
+            }
+        };
+
+        fetchEventDetails();
+    }, [meetingId, user?.userid]);
 
     // Initialize Socket.IO
     useEffect(() => {
@@ -527,28 +570,40 @@ export default function MeetingPage() {
             </div>
 
             {/* Sidebar */}
-            <div className="flex h-full w-1/4 shrink-0 flex-col border-b border-(--primary-border-color) bg-zinc-900 px-8 py-4">
-                <h1 className="text-2xl font-semibold">Tutoring Session</h1>
-                <p className="text-sm text-(--light-gray)">
-                    Meeting ID: {meetingId}
-                </p>
-                <p className="text-sm text-(--light-gray)">
-                    Participants: {memberCount}/2
-                </p>
-                <div className="flex items-center gap-2">
-                    <div
-                        className={`h-2 w-2 rounded-full ${isConnected ? "bg-green-500" : "bg-red-500"}`}
-                    />
-                    <span className="text-sm text-(--light-gray)">
-                        {isConnected ? "Connected" : "Disconnected"}
-                    </span>
+            <div className="flex h-full w-1/4 shrink-0 flex-col border-b border-(--primary-border-color) bg-zinc-900">
+                {/* Meeting Info Section */}
+                <div className="border-b border-gray-700 px-8 py-4">
+                    <h1 className="text-2xl font-semibold">Tutoring Session</h1>
+                    <p className="text-sm text-(--light-gray)">
+                        Meeting ID: {meetingId}
+                    </p>
+                    <p className="text-sm text-(--light-gray)">
+                        Participants: {memberCount}/2
+                    </p>
+                    <div className="flex items-center gap-2">
+                        <div
+                            className={`h-2 w-2 rounded-full ${isConnected ? "bg-green-500" : "bg-red-500"}`}
+                        />
+                        <span className="text-sm text-(--light-gray)">
+                            {isConnected ? "Connected" : "Disconnected"}
+                        </span>
+                    </div>
+
+                    {error && (
+                        <div className="mt-4 rounded-lg border border-red-500 bg-red-500/10 px-4 py-3 text-red-500">
+                            {error}
+                        </div>
+                    )}
                 </div>
 
-                {error && (
-                    <div className="mt-4 rounded-lg border border-red-500 bg-red-500/10 px-4 py-3 text-red-500">
-                        {error}
-                    </div>
-                )}
+                {/* Chat Component */}
+                <div className="flex-1 overflow-hidden">
+                    <Chat
+                        socket={socketRef.current}
+                        eventid={meetingId}
+                        userRole={userRole}
+                    />
+                </div>
             </div>
         </div>
     );
