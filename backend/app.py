@@ -25,8 +25,15 @@ app.config['JWT_SECRET_KEY'] = 'password'
 app.config['JWT_TOKEN_LOCATION'] = ['headers']
 app.config['JWT_CSRF_CHECK_FORM'] = False
 
-# Enable CORS
-CORS(app)
+# Enable CORS with proper configuration
+CORS(app, resources={
+    r"/*": {
+        "origins": ["http://localhost:3000", "http://127.0.0.1:3000", "https://tutorl.ink"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"],
+        "supports_credentials": True
+    }
+})
 
 # Initialize JWT
 jwt = JWTManager(app)
@@ -267,7 +274,7 @@ def get_event_offer(event_id):
 
 
 # Accept a tutor for an event
-@app.route('/event/<int:event_id>/accept', methods=['POST'])
+@app.route('/event/<int:event_id>/accept', methods=['POST', 'OPTIONS'])
 @jwt_required()
 def accept_event_offer(event_id):
     accepted_tutor = accept_tutor(
