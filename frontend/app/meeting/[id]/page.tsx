@@ -157,9 +157,15 @@ export default function MeetingPage() {
                 });
 
                 pc2Ref.current.addEventListener("track", (e) => {
+                    console.log("Track received:", e.track.kind);
                     if (remoteVideoRef.current && e.streams[0]) {
+                        console.log("Setting remote video stream");
                         remoteVideoRef.current.srcObject = e.streams[0];
                     }
+                });
+
+                pc2Ref.current.addEventListener("negotiationneeded", async () => {
+                    console.log("Negotiation needed on pc2");
                 });
 
                 // Add local stream
@@ -246,8 +252,26 @@ export default function MeetingPage() {
             });
 
             pc1Ref.current.addEventListener("track", (e) => {
+                console.log("Track received:", e.track.kind);
                 if (remoteVideoRef.current && e.streams[0]) {
+                    console.log("Setting remote video stream");
                     remoteVideoRef.current.srcObject = e.streams[0];
+                }
+            });
+
+            pc1Ref.current.addEventListener("negotiationneeded", async () => {
+                console.log("Negotiation needed, creating new offer");
+                try {
+                    const offer = await pc1Ref.current!.createOffer();
+                    await pc1Ref.current!.setLocalDescription(offer);
+                    if (socketRef.current) {
+                        socketRef.current.emit("offer", {
+                            sdp: pc1Ref.current!.localDescription!.sdp,
+                            type: pc1Ref.current!.localDescription!.type,
+                        });
+                    }
+                } catch (error) {
+                    console.error("Error during renegotiation:", error);
                 }
             });
 
@@ -278,6 +302,7 @@ export default function MeetingPage() {
 
     const handleShareScreen = async () => {
         try {
+            console.log("Starting screen share...");
             const screenStream = await navigator.mediaDevices.getDisplayMedia({
                 video: { cursor: "always" } as MediaTrackConstraints,
                 audio: false,
@@ -285,6 +310,7 @@ export default function MeetingPage() {
 
             screenStreamRef.current = screenStream;
             const screenTrack = screenStream.getVideoTracks()[0];
+            console.log("Got screen track:", screenTrack.id);
 
             // Find active peer connection and replace video track
             const pc = pc1Ref.current || pc2Ref.current;
@@ -295,6 +321,9 @@ export default function MeetingPage() {
                 );
 
                 if (videoSender && localStreamRef.current) {
+                    console.log("Replacing video track with screen share");
+                    
+                    // Replace the track
                     await videoSender.replaceTrack(screenTrack);
                     setIsScreenSharing(true);
 
@@ -303,8 +332,11 @@ export default function MeetingPage() {
                         localVideoRef.current.srcObject = screenStream;
                     }
 
+                    console.log("Screen share track replaced successfully");
+
                     // Handle screen share stop
                     screenTrack.onended = async () => {
+                        console.log("Screen share ended, switching back to camera");
                         const cameraTrack = localStreamRef.current
                             ?.getVideoTracks()[0];
                         if (cameraTrack && videoSender) {
@@ -315,10 +347,23 @@ export default function MeetingPage() {
                                 localVideoRef.current.srcObject =
                                     localStreamRef.current;
                             }
+                            console.log("Switched back to camera");
                         }
                         setIsScreenSharing(false);
+                        
+                        // Stop screen stream tracks
+                        if (screenStreamRef.current) {
+                            screenStreamRef.current.getTracks().forEach(track => track.stop());
+                            screenStreamRef.current = null;
+                        }
                     };
+                } else {
+                    console.error("Video sender not found or no local stream");
+                    setError("Failed to find video track");
                 }
+            } else {
+                console.error("No active peer connection");
+                setError("No active connection");
             }
         } catch (error) {
             console.error("Error sharing screen:", error);
