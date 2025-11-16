@@ -19,6 +19,7 @@ from src.add_meeting import add_meeting
 from src.list_offers import list_offers
 from src.list_events import list_events, list_tutee_events, list_tutor_events
 from src.recording import meeting_recorder, save_recording_blob, process_uploaded_recording
+import google.generativeai as genai
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -811,29 +812,68 @@ def api_meeting_recordings(meeting_id):
         logger.error(f"Error fetching meeting recordings: {e}", exc_info=True)
         return {'error': str(e)}, 500
 
-# @app.route('/api/transcripts/meeting/summary/<meeting_id>', methods=['GET'])
-# def api_summary_transcripts(meeting_id):
-#     """API endpoint to get summary of transcripts for a specific meeting"""
-#     try:
-#         # Call the existing api_meeting_transcripts function
-#         response, status_code = api_meeting_transcripts(meeting_id)
+@app.route('/api/transcripts/meeting/summary/<meeting_id>', methods=['GET'])
+def api_summary_transcripts(meeting_id):
+    """API endpoint to get summary of transcripts for a specific meeting"""
+    try:
+        # Get the stitched transcripts
+        result = api_meeting_transcripts_stitched(meeting_id)
+
+        # Call the remote API instead of local function for testing
+        # remote_url = f"https://api.tutorl.ink/api/transcripts_stitched/meeting/{meeting_id}"
+        # resp = requests.get(remote_url)
+        # if resp.status_code != 200:
+        #     return {'error': f"Remote API error: {resp.text}"}, resp.status_code
+        # result = resp.json()
         
-#         if status_code != 200:
-#             return response, status_code
+        # Handle tuple response (data, status_code)
+        if isinstance(result, tuple):
+            transcript_data, status_code = result
+            if status_code != 200:
+                return transcript_data, status_code
+        else:
+            transcript_data = result
         
-#         # Extract just the transcript objects from the response
-#         transcripts_list = []
-#         for transcript in response.get('transcripts', []):
-#             transcripts_list.append({
-#                 'participant_id': transcript.get('participant_id'),
-#                 'transcript': transcript.get('transcript', ''),
-#                 'word_count': transcript.get('word_count', 0)
-#             })
+        # Extract sentences from the stitched transcript
+        sentences = transcript_data.get('sentences', [])
+        if not sentences:
+            return {'error': 'No sentences found in transcript'}, 404
         
-#         return {'meeting_id': meeting_id, 'transcripts': transcripts_list}, 200
-#     except Exception as e:
-#         logger.error(f"Error fetching summary transcripts: {e}", exc_info=True)
-#         return {'error': str(e)}, 500
+        # Build the conversation text for Gemini
+        conversation_text = "\n".join([
+            f"Speaker {s['participant_id']}: {s['text']}"
+            for s in sentences
+        ])
+        
+        # Configure Gemini API
+        api_key = os.environ.get('GEMINI_API_KEY')
+        if not api_key:
+            return {'error': 'GEMINI_API_KEY not configured'}, 500
+        
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel('gemini-2.0-flash')
+        
+        # Create prompt for summarization
+        prompt = f"""Please provide a concise summary of the following conversation between tutoring session participants. 
+Focus on the main topics discussed, key points made, and any important takeaways or action items.
+
+Conversation:
+{conversation_text}
+
+Summary:"""
+        
+        # Generate summary
+        response = model.generate_content(prompt)
+        summary = response.text
+        
+        return {
+            'meeting_id': meeting_id,
+            'summary': summary,
+        }, 200
+        
+    except Exception as e:
+        logger.error(f"Error generating summary for meeting {meeting_id}: {e}", exc_info=True)
+        return {'error': str(e)}, 500
 
 @app.route('/api/transcripts_stitched/meeting/<meeting_id>')
 def api_meeting_transcripts_stitched(meeting_id):

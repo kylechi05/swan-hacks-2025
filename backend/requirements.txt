@@ -7,3 +7,4 @@ flask-jwt-extended
 sqlalchemy
 google-cloud-speech
 google-cloud-storage
+google-generativeai
