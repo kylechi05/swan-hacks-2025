@@ -24,13 +24,30 @@ export default function MeetingPage() {
 
     const configuration: RTCConfiguration = {
         iceServers: [
-            { urls: "stun:stun.l.google.com:19302" },
-            {
-                urls: "turn:numb.viagenie.ca",
-                username: "webrtc@live.com",
-                credential: "muazkh",
-            },
-        ],
+      {
+        urls: "stun:stun.relay.metered.ca:80",
+      },
+      {
+        urls: "turn:standard.relay.metered.ca:80",
+        username: "21681ef33e1175e2ba2aae3c",
+        credential: "LWN5QDGpz7QJtKTW",
+      },
+      {
+        urls: "turn:standard.relay.metered.ca:80?transport=tcp",
+        username: "21681ef33e1175e2ba2aae3c",
+        credential: "LWN5QDGpz7QJtKTW",
+      },
+      {
+        urls: "turn:standard.relay.metered.ca:443",
+        username: "21681ef33e1175e2ba2aae3c",
+        credential: "LWN5QDGpz7QJtKTW",
+      },
+      {
+        urls: "turns:standard.relay.metered.ca:443?transport=tcp",
+        username: "21681ef33e1175e2ba2aae3c",
+        credential: "LWN5QDGpz7QJtKTW",
+      },
+  ],
         iceCandidatePoolSize: 10,
         bundlePolicy: "max-bundle",
         iceTransportPolicy: "all",
