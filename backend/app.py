@@ -2,7 +2,6 @@
 from flask_socketio import SocketIO, send, emit, join_room, leave_room
 from flask import Flask, render_template, Response, request
 from flask_cors import CORS
-import src.videochat
 from src.login import login
 from src.signup import signup
 from src.subjects import subjects
@@ -24,9 +23,6 @@ CORS(app)
 jwt = JWTManager(app)
 
 socketio = SocketIO(app)
-
-# TODO: move camera init to meeting
-camera = src.videochat.VideoCamera()
 
 # TODO: Move users to DB, or find better way to handle what users are in what rooms
 users = {}
