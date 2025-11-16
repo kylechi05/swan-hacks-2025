@@ -263,7 +263,7 @@ export default function MyEvents() {
                                         >
                                             <a
                                                 href={`/meeting/${event.eventid}`}
-                                                className="mt-2 inline-block rounded bg-blue-600 px-4 py-2 text-white transition-all hover:bg-blue-500"
+                                                className="mt-2 inline-block rounded-lg bg-blue-600 px-4 py-1 text-white transition-all hover:bg-blue-500"
                                             >
                                                 Join Meeting
                                             </a>
@@ -328,7 +328,7 @@ export default function MyEvents() {
                                         >
                                             <a
                                                 href={`/meeting/${event.eventid}`}
-                                                className="mt-2 inline-block rounded bg-blue-600 px-4 py-2 text-white transition-all hover:bg-blue-500"
+                                                className="mt-2 inline-block rounded-lg bg-blue-600 px-4 py-1 text-white transition-all hover:bg-blue-500"
                                             >
                                                 Join Meeting
                                             </a>
