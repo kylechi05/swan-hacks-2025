@@ -11,6 +11,22 @@ socket.on('connect', function() {
 // Listen for incoming offers from other peers
 socket.on('offer', async function(data) {
   console.log('Received offer from remote peer');
+  
+  // If we don't have our stream yet, start it first
+  if (!localStream) {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({audio: true, video: true});
+      localVideo.srcObject = stream;
+      localStream = stream;
+      console.log('Activated camera for incoming call');
+      startButton.disabled = true;
+      hangupButton.disabled = false;
+    } catch (e) {
+      console.error('Failed to get user media:', e);
+      return;
+    }
+  }
+  
   if (!pc2) {
     // Create pc2 when we receive an offer from remote peer
     const configuration = {};
@@ -19,6 +35,12 @@ socket.on('offer', async function(data) {
     pc2.addEventListener('icecandidate', e => onIceCandidate(pc2, e));
     pc2.addEventListener('iceconnectionstatechange', e => onIceStateChange(pc2, e));
     pc2.addEventListener('track', gotRemoteStream);
+    
+    // Add local stream to pc2
+    if (localStream) {
+      localStream.getTracks().forEach(track => pc2.addTrack(track, localStream));
+      console.log('Added local stream to pc2');
+    }
   }
   
   try {
@@ -85,19 +107,17 @@ socket.on('ice-candidate', async function(data) {
 // Listen for peer-ready event (when second peer joins)
 socket.on('peer-ready', function() {
   console.log('Another peer is ready in the room');
-  // Automatically start the call if we have our local stream
-  if (localStream && !pc1) {
-    call();
+  // Automatically start if we haven't started yet
+  if (!localStream && !pc1) {
+    start();
   }
 });
 
 const startButton = document.getElementById('startButton');
 const callButton = document.getElementById('callButton');
 const hangupButton = document.getElementById('hangupButton');
-callButton.disabled = true;
 hangupButton.disabled = true;
 startButton.addEventListener('click', start);
-callButton.addEventListener('click', call);
 hangupButton.addEventListener('click', hangup);
 
 let startTime;
@@ -145,54 +165,58 @@ async function start() {
   console.log('Requesting local stream');
   startButton.disabled = true;
   try {
+    // Step 1: Activate camera
     const stream = await navigator.mediaDevices.getUserMedia({audio: true, video: true});
     console.log('Received local stream');
     localVideo.srcObject = stream;
     localStream = stream;
-    callButton.disabled = false;
+    
+    const videoTracks = localStream.getVideoTracks();
+    const audioTracks = localStream.getAudioTracks();
+    if (videoTracks.length > 0) {
+      console.log(`Using video device: ${videoTracks[0].label}`);
+    }
+    if (audioTracks.length > 0) {
+      console.log(`Using audio device: ${audioTracks[0].label}`);
+    }
+    
+    // Step 2: Create peer connection and start call
+    hangupButton.disabled = false;
+    console.log('Starting call');
+    startTime = window.performance.now();
+    
+    const configuration = {};
+    console.log('RTCPeerConnection configuration:', configuration);
+    pc1 = new RTCPeerConnection(configuration);
+    console.log('Created local peer connection object pc1');
+    
+    pc1.addEventListener('icecandidate', e => {
+      if (e.candidate) {
+        socket.emit('ice-candidate', {
+          candidate: e.candidate.candidate,
+          sdpMLineIndex: e.candidate.sdpMLineIndex,
+          sdpMid: e.candidate.sdpMid
+        });
+      }
+    });
+    pc1.addEventListener('iceconnectionstatechange', e => onIceStateChange(pc1, e));
+    pc1.addEventListener('track', gotRemoteStream);
+
+    localStream.getTracks().forEach(track => pc1.addTrack(track, localStream));
+    console.log('Added local stream to pc1');
+
+    // Step 3: Create and emit offer
+    try {
+      console.log('pc1 createOffer start');
+      const offer = await pc1.createOffer(offerOptions);
+      await onCreateOfferSuccess(offer);
+      console.log('Waiting for remote peer to connect...');
+    } catch (e) {
+      onCreateSessionDescriptionError(e);
+    }
   } catch (e) {
     alert(`getUserMedia() error: ${e.name}`);
-  }
-}
-
-async function call() {
-  callButton.disabled = true;
-  hangupButton.disabled = false;
-  console.log('Starting call');
-  startTime = window.performance.now();
-  const videoTracks = localStream.getVideoTracks();
-  const audioTracks = localStream.getAudioTracks();
-  if (videoTracks.length > 0) {
-    console.log(`Using video device: ${videoTracks[0].label}`);
-  }
-  if (audioTracks.length > 0) {
-    console.log(`Using audio device: ${audioTracks[0].label}`);
-  }
-  const configuration = {};
-  console.log('RTCPeerConnection configuration:', configuration);
-  pc1 = new RTCPeerConnection(configuration);
-  console.log('Created local peer connection object pc1');
-  pc1.addEventListener('icecandidate', e => {
-    if (e.candidate) {
-      socket.emit('ice-candidate', {
-        candidate: e.candidate.candidate,
-        sdpMLineIndex: e.candidate.sdpMLineIndex,
-        sdpMid: e.candidate.sdpMid
-      });
-    }
-  });
-  pc1.addEventListener('iceconnectionstatechange', e => onIceStateChange(pc1, e));
-  pc1.addEventListener('track', gotRemoteStream);
-
-  localStream.getTracks().forEach(track => pc1.addTrack(track, localStream));
-  console.log('Added local stream to pc1');
-
-  try {
-    console.log('pc1 createOffer start');
-    const offer = await pc1.createOffer(offerOptions);
-    await onCreateOfferSuccess(offer);
-  } catch (e) {
-    onCreateSessionDescriptionError(e);
+    startButton.disabled = false;
   }
 }
 
@@ -267,10 +291,20 @@ function onIceStateChange(pc, event) {
 
 function hangup() {
   console.log('Ending call');
-  pc1.close();
-  pc2.close();
-  pc1 = null;
-  pc2 = null;
+  if (pc1) {
+    pc1.close();
+    pc1 = null;
+  }
+  if (pc2) {
+    pc2.close();
+    pc2 = null;
+  }
+  if (localStream) {
+    localStream.getTracks().forEach(track => track.stop());
+    localStream = null;
+  }
+  localVideo.srcObject = null;
+  remoteVideo.srcObject = null;
   hangupButton.disabled = true;
-  callButton.disabled = false;
+  startButton.disabled = false;
 }
