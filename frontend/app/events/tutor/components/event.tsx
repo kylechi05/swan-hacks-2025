@@ -34,7 +34,7 @@ export function Event({ event, token }) {
             const startUnix = Math.floor(new Date(startTime).getTime() / 1000);
             const endUnix = Math.floor(new Date(endTime).getTime() / 1000);
             const res = await fetch(
-                `http://localhost:6969/event/${event.eventid}/offer`,
+                `https://api.tutorl.ink/event/${event.eventid}/offer`,
                 {
                     method: "POST",
                     headers: {

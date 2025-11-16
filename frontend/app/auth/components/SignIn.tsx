@@ -16,7 +16,7 @@ export function SignIn() {
         setError("");
 
         try {
-            const res = await fetch("http://localhost:6969/login", {
+            const res = await fetch("https://api.tutorl.ink/login", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",

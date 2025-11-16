@@ -31,7 +31,7 @@ export default function MeetingPage() {
 
     useEffect(() => {
         // Initialize socket connection
-        const socket = io('http://localhost:6969');
+        const socket = io('https://api.tutorl.ink');
         socketRef.current = socket;
 
         socket.on('connect', () => {
