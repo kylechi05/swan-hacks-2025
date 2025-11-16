@@ -1,6 +1,7 @@
 """
 Server-side media recording for meeting sessions.
 Uses aiortc to create a silent listener that records both audio and video streams.
+Automatically transcribes recordings when complete.
 """
 
 import asyncio
@@ -176,11 +177,19 @@ class MediaRecorderSession:
         """Stop recording and cleanup resources."""
         logger.info(f"Stopping recording session for participant {self.participant_id}")
         
+        output_file = self.output_file  # Save reference before cleanup
+        meeting_id = self.meeting_id
+        participant_id = self.participant_id
+        
         if self.recorder and self.is_recording:
             try:
                 await self.recorder.stop()
                 self.is_recording = False
-                logger.info(f"Recording saved to {self.output_file}")
+                logger.info(f"Recording saved to {output_file}")
+                
+                # Trigger transcription in background (non-blocking)
+                asyncio.create_task(self._transcribe_recording(output_file, meeting_id, participant_id))
+                
             except Exception as e:
                 logger.error(f"Error stopping recorder: {e}", exc_info=True)
         
@@ -195,6 +204,39 @@ class MediaRecorderSession:
                     logger.warning(f"Event loop closed while stopping peer connection for {self.participant_id}")
             except Exception as e:
                 logger.error(f"Error closing peer connection: {e}", exc_info=True)
+    
+    async def _transcribe_recording(self, video_path: str, meeting_id: str, participant_id: str):
+        """
+        Transcribe the recording in the background.
+        
+        Args:
+            video_path: Path to the video file
+            meeting_id: Meeting ID
+            participant_id: Participant ID
+        """
+        try:
+            # Import here to avoid circular dependencies
+            from src.transcription import transcription_service
+            
+            logger.info(f"Starting background transcription for {video_path}")
+            
+            # Run transcription in a thread pool to avoid blocking
+            loop = asyncio.get_event_loop()
+            transcript_path = await loop.run_in_executor(
+                None,
+                transcription_service.process_recording,
+                video_path,
+                meeting_id,
+                participant_id
+            )
+            
+            if transcript_path:
+                logger.info(f"Transcription completed: {transcript_path}")
+            else:
+                logger.warning(f"Transcription failed for {video_path}")
+                
+        except Exception as e:
+            logger.error(f"Error in background transcription: {e}", exc_info=True)
 
 
 class MeetingRecorder:

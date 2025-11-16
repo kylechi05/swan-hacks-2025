@@ -1,6 +1,7 @@
 import logging
 import asyncio
 import os
+import json
 from datetime import datetime
 from flask_socketio import SocketIO, send, emit, join_room, leave_room
 from flask import Flask, render_template, Response, request, send_from_directory
@@ -717,6 +718,66 @@ def api_meeting_recordings(meeting_id):
         return {'meeting_id': meeting_id, 'recordings': meeting_recordings}, 200
     except Exception as e:
         logger.error(f"Error fetching meeting recordings: {e}", exc_info=True)
+        return {'error': str(e)}, 500
+
+
+@app.route('/api/transcripts/meeting/<meeting_id>')
+def api_meeting_transcripts(meeting_id):
+    """API endpoint to get transcripts for a specific meeting"""
+    try:
+        from src.transcription import transcription_service
+        transcripts_dir = transcription_service.get_transcripts_dir()
+        meeting_transcripts = []
+        
+        if os.path.exists(transcripts_dir):
+            for filename in os.listdir(transcripts_dir):
+                if filename.endswith('_transcript.json') and filename.startswith(meeting_id + '_'):
+                    filepath = os.path.join(transcripts_dir, filename)
+                    
+                    # Parse filename
+                    parts = filename.replace('_transcript.json', '').split('_')
+                    participant_id = parts[1] if len(parts) > 1 else 'Unknown'
+                    
+                    # Read transcript data
+                    with open(filepath, 'r', encoding='utf-8') as f:
+                        transcript_data = json.load(f)
+                    
+                    stat = os.stat(filepath)
+                    meeting_transcripts.append({
+                        'filename': filename,
+                        'participant_id': participant_id,
+                        'transcript': transcript_data.get('transcript', ''),
+                        'words': transcript_data.get('words', []),
+                        'language': transcript_data.get('language', 'en-US'),
+                        'word_count': len(transcript_data.get('transcript', '').split()),
+                        'created': datetime.fromtimestamp(stat.st_ctime).isoformat()
+                    })
+        
+        return {'meeting_id': meeting_id, 'transcripts': meeting_transcripts}, 200
+    except Exception as e:
+        logger.error(f"Error fetching meeting transcripts: {e}", exc_info=True)
+        return {'error': str(e)}, 500
+
+
+@app.route('/transcripts/<meeting_id>/<participant_id>')
+def get_transcript(meeting_id, participant_id):
+    """Get transcript for a specific participant"""
+    try:
+        from src.transcription import transcription_service
+        transcripts_dir = transcription_service.get_transcripts_dir()
+        
+        filename = f"{meeting_id}_{participant_id}_transcript.json"
+        filepath = os.path.join(transcripts_dir, filename)
+        
+        if not os.path.exists(filepath):
+            return {'error': 'Transcript not found'}, 404
+        
+        with open(filepath, 'r', encoding='utf-8') as f:
+            transcript_data = json.load(f)
+        
+        return transcript_data, 200
+    except Exception as e:
+        logger.error(f"Error fetching transcript: {e}", exc_info=True)
         return {'error': str(e)}, 500
 
 

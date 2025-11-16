@@ -13,18 +13,35 @@ interface Recording {
     created: string;
 }
 
+interface Transcript {
+    filename: string;
+    participant_id: string;
+    transcript: string;
+    words: Array<{
+        word: string;
+        start_time: number;
+        end_time: number;
+        confidence: number;
+    }>;
+    language: string;
+    word_count: number;
+    created: string;
+}
+
 export default function SyncedRecordingPage() {
     const params = useParams();
     const router = useRouter();
     const meetingId = params.meetingId as string;
 
     const [recordings, setRecordings] = useState<Recording[]>([]);
+    const [transcripts, setTranscripts] = useState<Transcript[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [isSynced, setIsSynced] = useState(true);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
+    const [showTranscripts, setShowTranscripts] = useState(true);
 
     const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
     const syncCheckInterval = useRef<NodeJS.Timeout | null>(null);
@@ -40,6 +57,20 @@ export default function SyncedRecordingPage() {
 
                 const data = await response.json();
                 setRecordings(data.recordings);
+                
+                // Also fetch transcripts
+                try {
+                    const transcriptResponse = await fetch(
+                        `https://api.tutorl.ink/api/transcripts/meeting/${meetingId}`
+                    );
+                    if (transcriptResponse.ok) {
+                        const transcriptData = await transcriptResponse.json();
+                        setTranscripts(transcriptData.transcripts);
+                    }
+                } catch (err) {
+                    console.log("No transcripts available yet");
+                }
+                
                 setLoading(false);
             } catch (err) {
                 setError(err instanceof Error ? err.message : "Unknown error");
@@ -428,6 +459,52 @@ export default function SyncedRecordingPage() {
                         </li>
                     </ul>
                 </div>
+
+                {/* Transcripts Section */}
+                {transcripts.length > 0 && (
+                    <div className="mt-6 rounded-xl bg-gray-800 p-6 shadow-xl">
+                        <div className="mb-4 flex items-center justify-between">
+                            <h3 className="text-2xl font-bold text-purple-400">
+                                📝 Transcripts
+                            </h3>
+                            <button
+                                onClick={() => setShowTranscripts(!showTranscripts)}
+                                className="rounded-lg bg-purple-600 px-4 py-2 font-semibold transition hover:bg-purple-700"
+                            >
+                                {showTranscripts ? "Hide" : "Show"}
+                            </button>
+                        </div>
+
+                        {showTranscripts && (
+                            <div className="space-y-6">
+                                {transcripts.map((transcript, index) => (
+                                    <div
+                                        key={transcript.filename}
+                                        className="rounded-lg border border-gray-700 bg-gray-900 p-4"
+                                    >
+                                        <div className="mb-3 flex items-center justify-between">
+                                            <h4 className="text-lg font-semibold text-purple-300">
+                                                Participant {index + 1}
+                                            </h4>
+                                            <div className="text-sm text-gray-400">
+                                                {transcript.word_count} words | {transcript.language}
+                                            </div>
+                                        </div>
+                                        <p className="leading-relaxed text-gray-300">
+                                            {transcript.transcript || "Transcription in progress..."}
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        
+                        {transcripts.length === 0 && (
+                            <p className="text-center text-gray-400">
+                                Transcripts are being generated... This may take a few minutes.
+                            </p>
+                        )}
+                    </div>
+                )}
             </div>
         </div>
     );
