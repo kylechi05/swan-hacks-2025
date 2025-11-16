@@ -24,7 +24,7 @@ export default function CreateEvent() {
     useEffect(() => {
         async function loadSubjects() {
             try {
-                const res = await fetch("http://localhost:6969/subjects", {
+                const res = await fetch("https://api.tutorl.ink/subjects", {
                     method: "GET",
                     headers: {
                         "Content-Type": "application/json",
@@ -61,7 +61,7 @@ export default function CreateEvent() {
             const end = new Date(`${form.endDate}T${form.endTime}:00`);
             const endUnix = Math.floor(end.getTime() / 1000);
 
-            const res = await fetch("http://localhost:6969/event/create", {
+            const res = await fetch("https://api.tutorl.ink/event/create", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",

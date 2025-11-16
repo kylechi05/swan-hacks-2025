@@ -16,13 +16,15 @@ def list_events():
         for event in events:
             event_data = {
                 'eventid': event.eventid,
-                'userid_requester': event.userid_requester,
+                'userid_tutee': event.userid_tutee,
                 'title': event.title,
-                'subject': event.subject,
+                'category': event.category,
                 'description': event.description,
                 'possible_tutors': json.loads(event.possible_tutors) if event.possible_tutors else [],
-                'accepted_tutor': json.loads(event.accepted_tutor) if event.accepted_tutor else None,
-                'is_accepted': event.is_accepted
+                'userid_tutor': json.loads(event.userid_tutor) if event.userid_tutor else None,
+                'is_accepted': event.is_accepted,
+                'available_start_time': event.available_start_time,
+                'available_end_time': event.available_end_time
             }
             event_list.append(event_data)
         
@@ -41,11 +43,13 @@ def list_tutee_events(userid_tutee):
                 'eventid': event.eventid,
                 'userid_tutee': event.userid_tutee,
                 'title': event.title,
-                'subject': event.subject,
+                'category': event.category,
                 'description': event.description,
                 'possible_tutors': json.loads(event.possible_tutors) if event.possible_tutors else [],
-                'accepted_tutor': json.loads(event.accepted_tutor) if event.accepted_tutor else None,
-                'is_accepted': event.is_accepted
+                'userid_tutor': json.loads(event.userid_tutor) if event.userid_tutor else None,
+                'is_accepted': event.is_accepted,
+                'available_start_time': event.available_start_time,
+                'available_end_time': event.available_end_time
             }
             event_list.append(event_data)
         
@@ -67,11 +71,13 @@ def list_tutor_events(userid_tutor):
                         'eventid': event.eventid,
                         'userid_tutee': event.userid_tutee,
                         'title': event.title,
-                        'subject': event.subject,
+                        'category': event.category,
                         'description': event.description,
                         'possible_tutors': possible_tutors_list,
-                        'accepted_tutor': event.accepted_tutor,
-                        'is_accepted': event.is_accepted
+                        'userid_tutor': event.userid_tutor,
+                        'is_accepted': event.is_accepted,
+                        'available_start_time': event.available_start_time,
+                        'available_end_time': event.available_end_time
                     }
                     tutor_event_list.append(event_data)
         

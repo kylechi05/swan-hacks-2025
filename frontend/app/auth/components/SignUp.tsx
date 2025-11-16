@@ -23,7 +23,7 @@ export function SignUp() {
         console.log("Sign-up data:", form);
 
         try {
-            const res = await fetch("http://localhost:6969/signup", {
+            const res = await fetch("https://api.tutorl.ink/signup", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
