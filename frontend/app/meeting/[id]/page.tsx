@@ -167,7 +167,21 @@ export default function MeetingPage() {
                 });
 
                 pc2Ref.current.addEventListener("negotiationneeded", async () => {
-                    console.log("Negotiation needed on pc2");
+                    console.log("Negotiation needed on pc2, creating offer");
+                    try {
+                        if (pc2Ref.current && pc2Ref.current.signalingState === "stable") {
+                            const offer = await pc2Ref.current.createOffer();
+                            await pc2Ref.current.setLocalDescription(offer);
+                            if (socketRef.current) {
+                                socketRef.current.emit("offer", {
+                                    sdp: pc2Ref.current.localDescription!.sdp,
+                                    type: pc2Ref.current.localDescription!.type,
+                                });
+                            }
+                        }
+                    } catch (error) {
+                        console.error("Error during renegotiation on pc2:", error);
+                    }
                 });
 
                 // Add local stream
@@ -342,9 +356,16 @@ export default function MeetingPage() {
 
                 if (videoSender && localStreamRef.current) {
                     console.log("Replacing video track with screen share");
+                    const oldTrack = videoSender.track;
                     
                     // Replace the track
                     await videoSender.replaceTrack(screenTrack);
+                    
+                    // Stop the old camera track
+                    if (oldTrack) {
+                        oldTrack.stop();
+                    }
+                    
                     setIsScreenSharing(true);
 
                     // Show screen share in local video
@@ -355,15 +376,36 @@ export default function MeetingPage() {
                     // Handle screen share stop
                     screenTrack.onended = async () => {
                         console.log("Screen share ended, switching back to camera");
-                        const cameraTrack = localStreamRef.current
-                            ?.getVideoTracks()[0];
-                        if (cameraTrack && videoSender) {
-                            await videoSender.replaceTrack(cameraTrack);
-                            if (localStreamRef.current) {
-                                setMyStream(localStreamRef.current);
+                        try {
+                            // Get a fresh camera stream
+                            const newCameraStream = await navigator.mediaDevices.getUserMedia({
+                                audio: true,
+                                video: true,
+                            });
+                            
+                            const newVideoTrack = newCameraStream.getVideoTracks()[0];
+                            const newAudioTrack = newCameraStream.getAudioTracks()[0];
+                            
+                            // Update local stream ref
+                            localStreamRef.current = newCameraStream;
+                            
+                            // Replace video track
+                            if (videoSender) {
+                                await videoSender.replaceTrack(newVideoTrack);
                             }
+                            
+                            // Also replace audio track if it exists
+                            const audioSender = pc.getSenders().find(s => s.track?.kind === "audio");
+                            if (audioSender) {
+                                await audioSender.replaceTrack(newAudioTrack);
+                            }
+                            
+                            setMyStream(newCameraStream);
                             console.log("Switched back to camera");
+                        } catch (err) {
+                            console.error("Error switching back to camera:", err);
                         }
+                        
                         setIsScreenSharing(false);
                         
                         // Stop screen stream tracks
