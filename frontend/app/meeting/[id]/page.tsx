@@ -327,7 +327,7 @@ export default function MeetingPage() {
                 setIsCallActive(true);
             }
 
-            // Create peer connection
+            // Create peer connection if it doesn't exist
             if (!pc2Ref.current) {
                 console.log("[HandleOffer] Creating PC2 (answerer)");
                 pc2Ref.current = new RTCPeerConnection(configuration);
@@ -356,8 +356,15 @@ export default function MeetingPage() {
                             streamId: e.streams[0].id,
                             tracks: e.streams[0].getTracks().map(t => ({ kind: t.kind, id: t.id, label: t.label }))
                         });
+                        // For renegotiation (like screen share), we need to update the srcObject
                         remoteVideoRef.current.srcObject = e.streams[0];
                     }
+                });
+
+                pc2Ref.current.addEventListener("negotiationneeded", async () => {
+                    console.log("[PC2] Negotiation needed event fired");
+                    // PC2 is the answerer, so it should not initiate offers
+                    // This event can fire but we let PC1 drive renegotiation
                 });
 
                 // Add local stream
@@ -373,13 +380,13 @@ export default function MeetingPage() {
                 }
             }
 
-            // Handle the offer using proper sequence
+            // Handle the offer - this works for both initial connection and renegotiation
             const offerCollision = pc2Ref.current.signalingState !== "stable";
-            ignoreOfferRef.current = offerCollision;
             
-            if (ignoreOfferRef.current) {
-                console.log("[HandleOffer] Ignoring offer due to collision");
-                return;
+            if (offerCollision) {
+                console.log("[HandleOffer] Collision detected - we're polite, so we'll rollback");
+                // Rollback to stable state before accepting new offer
+                await pc2Ref.current.setLocalDescription({type: "rollback"} as RTCSessionDescriptionInit);
             }
 
             console.log("[HandleOffer] Setting remote description");
