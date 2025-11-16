@@ -1,8 +1,13 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
 from contextlib import contextmanager
-from src.models import Base
 import os
+
+# Import Base - handle both direct run and module import
+try:
+    from models import Base
+except ImportError:
+    from src.models import Base
 
 # Get the directory where this file is located
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
