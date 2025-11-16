@@ -13,6 +13,8 @@ export default function MeetingPage() {
     const [isCallActive, setIsCallActive] = useState(false);
     const [isScreenSharing, setIsScreenSharing] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [shouldStartCall, setShouldStartCall] = useState(false);
+    const [shouldShareScreen, setShouldShareScreen] = useState(false);
 
     const socketRef = useRef<Socket | null>(null);
     const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -21,6 +23,7 @@ export default function MeetingPage() {
     const pc1Ref = useRef<RTCPeerConnection | null>(null);
     const pc2Ref = useRef<RTCPeerConnection | null>(null);
     const screenStreamRef = useRef<MediaStream | null>(null);
+    const isOfferCreatorRef = useRef<boolean>(false);
 
     const configuration: RTCConfiguration = {
         iceServers: [
@@ -87,7 +90,7 @@ export default function MeetingPage() {
         socket.on("peer-ready", () => {
             console.log("Another peer is ready");
             if (!localStreamRef.current && !pc1Ref.current) {
-                handleStart();
+                setShouldStartCall(true);
             }
         });
 
@@ -121,11 +124,127 @@ export default function MeetingPage() {
                     track.stop()
                 );
             }
+            if (screenStreamRef.current) {
+                screenStreamRef.current.getTracks().forEach((track) =>
+                    track.stop()
+                );
+            }
             if (pc1Ref.current) pc1Ref.current.close();
             if (pc2Ref.current) pc2Ref.current.close();
             socket.disconnect();
         };
     }, [meetingId]);
+
+    // Effect to get user media when call starts
+    useEffect(() => {
+        if (!shouldStartCall || localStreamRef.current) return;
+
+        let mounted = true;
+
+        const getUserMedia = async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: true,
+                    video: true,
+                });
+
+                if (!mounted) {
+                    stream.getTracks().forEach((track) => track.stop());
+                    return;
+                }
+
+                localStreamRef.current = stream;
+                if (localVideoRef.current) {
+                    localVideoRef.current.srcObject = stream;
+                }
+                setIsCallActive(true);
+                isOfferCreatorRef.current = true;
+            } catch (error) {
+                console.error("Error accessing media devices:", error);
+                setError("Failed to access camera/microphone");
+                setShouldStartCall(false);
+            }
+        };
+
+        getUserMedia();
+
+        return () => {
+            mounted = false;
+        };
+    }, [shouldStartCall]);
+
+    // Effect to create peer connection and send offer
+    useEffect(() => {
+        if (!isCallActive || !localStreamRef.current || !isOfferCreatorRef.current || pc1Ref.current) return;
+
+        const createPeerConnection = async () => {
+            try {
+                pc1Ref.current = new RTCPeerConnection(configuration);
+
+                pc1Ref.current.addEventListener("icecandidate", (e) => {
+                    if (e.candidate && socketRef.current) {
+                        socketRef.current.emit("ice-candidate", {
+                            candidate: e.candidate.candidate,
+                            sdpMLineIndex: e.candidate.sdpMLineIndex,
+                            sdpMid: e.candidate.sdpMid,
+                        });
+                    }
+                });
+
+                pc1Ref.current.addEventListener("track", (e) => {
+                    console.log("Track received:", e.track.kind);
+                    if (remoteVideoRef.current && e.streams[0]) {
+                        console.log("Setting remote video stream");
+                        remoteVideoRef.current.srcObject = e.streams[0];
+                    }
+                });
+
+                pc1Ref.current.addEventListener("negotiationneeded", async () => {
+                    console.log("Negotiation needed, creating new offer");
+                    try {
+                        if (pc1Ref.current && pc1Ref.current.signalingState !== "closed") {
+                            const offer = await pc1Ref.current.createOffer();
+                            await pc1Ref.current.setLocalDescription(offer);
+                            if (socketRef.current) {
+                                socketRef.current.emit("offer", {
+                                    sdp: pc1Ref.current.localDescription!.sdp,
+                                    type: pc1Ref.current.localDescription!.type,
+                                });
+                            }
+                        }
+                    } catch (error) {
+                        console.error("Error during renegotiation:", error);
+                    }
+                });
+
+                // Add local stream to peer connection
+                if (localStreamRef.current) {
+                    localStreamRef.current.getTracks().forEach((track) => {
+                        pc1Ref.current!.addTrack(track, localStreamRef.current!);
+                    });
+                }
+
+                // Create and send initial offer
+                const offer = await pc1Ref.current.createOffer({
+                    offerToReceiveAudio: true,
+                    offerToReceiveVideo: true,
+                });
+                await pc1Ref.current.setLocalDescription(offer);
+
+                if (socketRef.current) {
+                    socketRef.current.emit("offer", {
+                        sdp: pc1Ref.current.localDescription!.sdp,
+                        type: pc1Ref.current.localDescription!.type,
+                    });
+                }
+            } catch (error) {
+                console.error("Error creating peer connection:", error);
+                setError("Failed to establish connection");
+            }
+        };
+
+        createPeerConnection();
+    }, [isCallActive, configuration]);
 
     const handleOffer = async (data: { sdp: string; type: RTCSdpType }) => {
         try {
@@ -225,150 +344,111 @@ export default function MeetingPage() {
         }
     };
 
-    const handleStart = async () => {
-        try {
-            // Get local stream
-            const stream = await navigator.mediaDevices.getUserMedia({
-                audio: true,
-                video: true,
-            });
-            if (localVideoRef.current) {
-                localVideoRef.current.srcObject = stream;
-            }
-            localStreamRef.current = stream;
-            setIsCallActive(true);
+    // Effect to handle screen sharing
+    useEffect(() => {
+        if (!shouldShareScreen || !isCallActive) return;
 
-            // Create peer connection
-            pc1Ref.current = new RTCPeerConnection(configuration);
+        let mounted = true;
+        let screenStream: MediaStream | null = null;
 
-            pc1Ref.current.addEventListener("icecandidate", (e) => {
-                if (e.candidate && socketRef.current) {
-                    socketRef.current.emit("ice-candidate", {
-                        candidate: e.candidate.candidate,
-                        sdpMLineIndex: e.candidate.sdpMLineIndex,
-                        sdpMid: e.candidate.sdpMid,
-                    });
-                }
-            });
-
-            pc1Ref.current.addEventListener("track", (e) => {
-                console.log("Track received:", e.track.kind);
-                if (remoteVideoRef.current && e.streams[0]) {
-                    console.log("Setting remote video stream");
-                    remoteVideoRef.current.srcObject = e.streams[0];
-                }
-            });
-
-            pc1Ref.current.addEventListener("negotiationneeded", async () => {
-                console.log("Negotiation needed, creating new offer");
-                try {
-                    const offer = await pc1Ref.current!.createOffer();
-                    await pc1Ref.current!.setLocalDescription(offer);
-                    if (socketRef.current) {
-                        socketRef.current.emit("offer", {
-                            sdp: pc1Ref.current!.localDescription!.sdp,
-                            type: pc1Ref.current!.localDescription!.type,
-                        });
-                    }
-                } catch (error) {
-                    console.error("Error during renegotiation:", error);
-                }
-            });
-
-            // Add local stream to peer connection
-            stream.getTracks().forEach((track) => {
-                pc1Ref.current!.addTrack(track, stream);
-            });
-
-            // Create and send offer
-            const offer = await pc1Ref.current.createOffer({
-                offerToReceiveAudio: true,
-                offerToReceiveVideo: true,
-            });
-            await pc1Ref.current.setLocalDescription(offer);
-
-            if (socketRef.current) {
-                socketRef.current.emit("offer", {
-                    sdp: pc1Ref.current.localDescription!.sdp,
-                    type: pc1Ref.current.localDescription!.type,
+        const startScreenShare = async () => {
+            try {
+                console.log("Starting screen share...");
+                screenStream = await navigator.mediaDevices.getDisplayMedia({
+                    video: { cursor: "always" } as MediaTrackConstraints,
+                    audio: false,
                 });
+
+                if (!mounted) {
+                    screenStream.getTracks().forEach((track) => track.stop());
+                    return;
+                }
+
+                screenStreamRef.current = screenStream;
+                const screenTrack = screenStream.getVideoTracks()[0];
+                console.log("Got screen track:", screenTrack.id);
+
+                // Find active peer connection and replace video track
+                const pc = pc1Ref.current || pc2Ref.current;
+                if (pc) {
+                    const senders = pc.getSenders();
+                    const videoSender = senders.find((sender) =>
+                        sender.track?.kind === "video"
+                    );
+
+                    if (videoSender && localStreamRef.current) {
+                        console.log("Replacing video track with screen share");
+
+                        // Replace the track
+                        await videoSender.replaceTrack(screenTrack);
+                        setIsScreenSharing(true);
+
+                        // Show screen share in local video
+                        if (localVideoRef.current) {
+                            localVideoRef.current.srcObject = screenStream;
+                        }
+
+                        console.log("Screen share track replaced successfully");
+
+                        // Handle screen share stop
+                        screenTrack.onended = async () => {
+                            if (!mounted) return;
+                            
+                            console.log("Screen share ended, switching back to camera");
+                            const cameraTrack = localStreamRef.current
+                                ?.getVideoTracks()[0];
+                            if (cameraTrack && videoSender) {
+                                await videoSender.replaceTrack(cameraTrack);
+                                if (
+                                    localVideoRef.current && localStreamRef.current
+                                ) {
+                                    localVideoRef.current.srcObject =
+                                        localStreamRef.current;
+                                }
+                                console.log("Switched back to camera");
+                            }
+                            setIsScreenSharing(false);
+                            setShouldShareScreen(false);
+
+                            // Stop screen stream tracks
+                            if (screenStreamRef.current) {
+                                screenStreamRef.current.getTracks().forEach(track => track.stop());
+                                screenStreamRef.current = null;
+                            }
+                        };
+                    } else {
+                        console.error("Video sender not found or no local stream");
+                        setError("Failed to find video track");
+                        setShouldShareScreen(false);
+                    }
+                } else {
+                    console.error("No active peer connection");
+                    setError("No active connection");
+                    setShouldShareScreen(false);
+                }
+            } catch (error) {
+                console.error("Error sharing screen:", error);
+                setError("Failed to share screen");
+                setShouldShareScreen(false);
             }
-        } catch (error) {
-            console.error("Error starting call:", error);
-            setError("Failed to access camera/microphone");
-            setIsCallActive(false);
-        }
+        };
+
+        startScreenShare();
+
+        return () => {
+            mounted = false;
+            if (screenStream) {
+                screenStream.getTracks().forEach((track) => track.stop());
+            }
+        };
+    }, [shouldShareScreen, isCallActive]);
+
+    const handleStart = () => {
+        setShouldStartCall(true);
     };
 
-    const handleShareScreen = async () => {
-        try {
-            console.log("Starting screen share...");
-            const screenStream = await navigator.mediaDevices.getDisplayMedia({
-                video: { cursor: "always" } as MediaTrackConstraints,
-                audio: false,
-            });
-
-            screenStreamRef.current = screenStream;
-            const screenTrack = screenStream.getVideoTracks()[0];
-            console.log("Got screen track:", screenTrack.id);
-
-            // Find active peer connection and replace video track
-            const pc = pc1Ref.current || pc2Ref.current;
-            if (pc) {
-                const senders = pc.getSenders();
-                const videoSender = senders.find((sender) =>
-                    sender.track?.kind === "video"
-                );
-
-                if (videoSender && localStreamRef.current) {
-                    console.log("Replacing video track with screen share");
-                    
-                    // Replace the track
-                    await videoSender.replaceTrack(screenTrack);
-                    setIsScreenSharing(true);
-
-                    // Show screen share in local video
-                    if (localVideoRef.current) {
-                        localVideoRef.current.srcObject = screenStream;
-                    }
-
-                    console.log("Screen share track replaced successfully");
-
-                    // Handle screen share stop
-                    screenTrack.onended = async () => {
-                        console.log("Screen share ended, switching back to camera");
-                        const cameraTrack = localStreamRef.current
-                            ?.getVideoTracks()[0];
-                        if (cameraTrack && videoSender) {
-                            await videoSender.replaceTrack(cameraTrack);
-                            if (
-                                localVideoRef.current && localStreamRef.current
-                            ) {
-                                localVideoRef.current.srcObject =
-                                    localStreamRef.current;
-                            }
-                            console.log("Switched back to camera");
-                        }
-                        setIsScreenSharing(false);
-                        
-                        // Stop screen stream tracks
-                        if (screenStreamRef.current) {
-                            screenStreamRef.current.getTracks().forEach(track => track.stop());
-                            screenStreamRef.current = null;
-                        }
-                    };
-                } else {
-                    console.error("Video sender not found or no local stream");
-                    setError("Failed to find video track");
-                }
-            } else {
-                console.error("No active peer connection");
-                setError("No active connection");
-            }
-        } catch (error) {
-            console.error("Error sharing screen:", error);
-            setError("Failed to share screen");
-        }
+    const handleShareScreen = () => {
+        setShouldShareScreen(true);
     };
 
     const handleHangup = () => {
