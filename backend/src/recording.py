@@ -118,7 +118,7 @@ class MediaRecorderSession:
             return
             
         try:            
-            self.recorder = MediaRecorder(self.output_file.replace('.mp4', '.webm'), format='webm')            
+            self.recorder = MediaRecorder(self.output_file, format="mp4")
             if self.video_track:
                 self.recorder.addTrack(self.video_track)
                 logger.info(f"[Recording] Added video track to recorder for {self.participant_id}")
@@ -161,22 +161,6 @@ class MediaRecorderSession:
             # Log what tracks we're expecting
             for transceiver in self.pc.getTransceivers():
                 logger.info(f"Transceiver: {transceiver.kind}, direction: {transceiver.direction}")
-
-            # Option (b): Force H264 for MP4 container compatibility
-            try:
-                transceivers = self.pc.getTransceivers()
-                capabilities = RTCRtpReceiver.getCapabilities("video")
-                h264_codecs = []
-                if capabilities and getattr(capabilities, "codecs", None):
-                    h264_codecs = [c for c in capabilities.codecs if c.mimeType and c.mimeType.lower() == "video/h264"]
-                for transceiver in transceivers:
-                    if transceiver.kind == "video" and h264_codecs:
-                        transceiver.setCodecPreferences(h264_codecs)
-                        logger.info(f"[Recording] Applied H264 codec preference for participant {self.participant_id}")
-                if not h264_codecs:
-                    logger.warning(f"[Recording] No H264 codecs available to prefer for participant {self.participant_id}")
-            except Exception as codec_err:
-                logger.error(f"[Recording] Failed to set H264 codec preference: {codec_err}")
             
             # Create answer
             answer = await self.pc.createAnswer()
