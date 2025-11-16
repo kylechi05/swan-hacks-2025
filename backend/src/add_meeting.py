@@ -1,6 +1,6 @@
 from src.models import Meeting
 from src.database import get_db
-import datetime
+from datetime import datetime
 
 def add_meeting(eventid, start, end):
     """
