@@ -22,6 +22,7 @@ interface MeetingGroup {
 export default function RecordingsListPage() {
     const { user, token } = useAuth();
     const router = useRouter();
+    const [isInfoOpen, setIsInfoOpen] = useState(false);
     const [meetings, setMeetings] = useState<MeetingGroup[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -100,11 +101,29 @@ export default function RecordingsListPage() {
             </div>
 
             <div className="mx-auto max-w-7xl p-6">
-                {/* Info Card */}
-                <div className="my-8 rounded-xl border-2 border-green-600 bg-green-900/20 py-5 px-8">
-                    <h3 className="mb-3 text-xl font-bold text-green-400">
-                        ℹ️ About Recordings
-                    </h3>
+                {/* Collapsible Info Card */}
+            <div className="my-8 rounded-xl border-2 border-green-600 bg-green-900/20">
+                <button
+                    onClick={() => setIsInfoOpen(!isInfoOpen)}
+                    className="flex w-full items-center justify-between py-4 px-8 font-semibold text-green-400 transition hover:text-green-300"
+                >
+                    <span>ℹ️ About Recordings</span>
+                    <span
+                        className={`cursor-pointer transition-transform duration-300 ${
+                            isInfoOpen ? "rotate-180" : ""
+                        }`}
+                    >
+                        ▼
+                    </span>
+                </button>
+
+                <div
+                    className={`overflow-hidden transition-[max-height,opacity,padding] duration-300 ease-in-out px-8 ${
+                        isInfoOpen
+                            ? "max-h-96 py-5 opacity-100"
+                            : "max-h-0 py-0 opacity-0"
+                    }`}
+                >
                     <div className="space-y-1 text-gray-300">
                         <p>
                             • Each meeting is automatically recorded from both
@@ -124,6 +143,7 @@ export default function RecordingsListPage() {
                         </p>
                     </div>
                 </div>
+            </div>
                 {loading ? (
                     <div className="flex min-h-[400px] items-center justify-center">
                         <div className="text-center">

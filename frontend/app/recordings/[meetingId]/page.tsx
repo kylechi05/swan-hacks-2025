@@ -28,26 +28,47 @@ interface Transcript {
     created: string;
 }
 
-const sliderClass =
-  "w-full h-2 cursor-pointer rounded-lg bg-gray-700 accent-green-500 transition-all hover:accent-green-400 focus:outline-none focus:ring-2 focus:ring-green-500";
+interface Sentence {
+    end: number;
+    participant_id: string;
+    start: number;
+    text: string;
+}
 
+interface StitchedTranscript {
+    participant_count: number;
+    sentence_count: number;
+    sentences: Sentence[];
+}
+
+const sliderClass =
+    "w-full h-2 cursor-pointer rounded-lg bg-gray-700 accent-green-500 transition-all hover:accent-green-400 focus:outline-none focus:ring-2 focus:ring-green-500";
 
 export default function SyncedRecordingPage() {
     const params = useParams();
     const router = useRouter();
     const meetingId = params.meetingId as string;
 
+    const [isInfoOpen, setIsInfoOpen] = useState(false);
     const [recordings, setRecordings] = useState<Recording[]>([]);
     const [transcripts, setTranscripts] = useState<Transcript[]>([]);
+    const [stitchedTranscripts, setStitchedTranscripts] =
+        useState<StitchedTranscript>({
+            participant_count: 0,
+            sentence_count: 0,
+            sentences: [],
+        });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [isSynced, setIsSynced] = useState(true);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
+    const [showStitchedTranscripts, setShowStitchedTranscripts] =
+        useState(true);
     const [showTranscripts, setShowTranscripts] = useState(true);
 
-    const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
+    const videoRefs = useRef<HTMLVideoElement | null>([]);
     const syncCheckInterval = useRef<NodeJS.Timeout | null>(null);
 
     // Fetch recordings for this meeting
@@ -70,6 +91,20 @@ export default function SyncedRecordingPage() {
                     if (transcriptResponse.ok) {
                         const transcriptData = await transcriptResponse.json();
                         setTranscripts(transcriptData.transcripts);
+                    }
+                } catch (err) {
+                    console.log("No transcripts available yet");
+                }
+
+                try {
+                    const stitchedTranscriptResponse = await fetch(
+                        `https://api.tutorl.ink/api/transcripts_stitched/meeting/${meetingId}`,
+                    );
+                    if (stitchedTranscriptResponse.ok) {
+                        const stitchedTranscriptData =
+                            await stitchedTranscriptResponse.json();
+                        console.log(stitchedTranscriptData);
+                        setStitchedTranscripts(stitchedTranscriptData);
                     }
                 } catch (err) {
                     console.log("No transcripts available yet");
@@ -295,6 +330,67 @@ export default function SyncedRecordingPage() {
             </div>
 
             <div className="mx-auto max-w-7xl p-6">
+                {/* Info Panel */}
+                <div className="my-8 rounded-xl border-2 border-green-600 bg-green-900/20">
+                    <button
+                        onClick={() => setIsInfoOpen(!isInfoOpen)}
+                        className="flex w-full items-center justify-between px-8 py-4 font-semibold text-green-400 transition hover:text-green-300"
+                    >
+                        <span>💡 Synced Playback Tips</span>
+                        <span
+                            className={`cursor-pointer transition-transform duration-300 ${isInfoOpen ? "rotate-180" : ""}`}
+                        >
+                            ▼
+                        </span>
+                    </button>
+
+                    <div
+                        className={`overflow-hidden px-8 transition-[max-height,opacity,padding] duration-300 ease-in-out ${
+                            isInfoOpen
+                                ? "max-h-96 py-5 opacity-100"
+                                : "max-h-0 py-0 opacity-0"
+                        }`}
+                    >
+                        <ul className="space-y-1 text-gray-300">
+                            <li className="flex items-start gap-2">
+                                <span className="text-green-400">•</span>
+                                <span>
+                                    Videos are automatically synchronized when
+                                    you press play
+                                </span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                                <span className="text-green-400">•</span>
+                                <span>
+                                    Use the timeline to seek to any point in the
+                                    meeting
+                                </span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                                <span className="text-green-400">•</span>
+                                <span>
+                                    Adjust individual participant volumes with
+                                    the sliders
+                                </span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                                <span className="text-green-400">•</span>
+                                <span>
+                                    If videos go out of sync, click "Re-sync
+                                    Videos" to realign them
+                                </span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                                <span className="text-green-400">•</span>
+                                <span>
+                                    Keyboard shortcuts: Space (play/pause), ←
+                                    (back 5s), → (forward 5s)
+                                </span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
                 {/* Controls Panel */}
                 <div className="mb-6 rounded-xl bg-gray-800 p-6 shadow-xl">
                     <div className="mb-6 flex items-center justify-between">
@@ -430,68 +526,87 @@ export default function SyncedRecordingPage() {
                     ))}
                 </div>
 
-                {/* Info Panel */}
-                <div className="mt-6 rounded-xl border-2 border-green-600 bg-green-900/20 p-6">
-                    <h3 className="mb-4 text-xl font-bold text-green-400">
-                        💡 Synced Playback Tips
-                    </h3>
-                    <ul className="space-y-2 text-gray-300">
-                        <li className="flex items-start gap-2">
-                            <span className="text-green-400">•</span>
-                            <span>
-                                Videos are automatically synchronized when you
-                                press play
-                            </span>
-                        </li>
-                        <li className="flex items-start gap-2">
-                            <span className="text-green-400">•</span>
-                            <span>
-                                Use the timeline to seek to any point in the
-                                meeting
-                            </span>
-                        </li>
-                        <li className="flex items-start gap-2">
-                            <span className="text-green-400">•</span>
-                            <span>
-                                Adjust individual participant volumes with the
-                                sliders
-                            </span>
-                        </li>
-                        <li className="flex items-start gap-2">
-                            <span className="text-green-400">•</span>
-                            <span>
-                                If videos go out of sync, click "Re-sync Videos"
-                                to realign them
-                            </span>
-                        </li>
-                        <li className="flex items-start gap-2">
-                            <span className="text-green-400">•</span>
-                            <span>
-                                Keyboard shortcuts: Space (play/pause), ← (back
-                                5s), → (forward 5s)
-                            </span>
-                        </li>
-                    </ul>
-                </div>
-
-                {/* Transcripts Section */}
-                {transcripts.length > 0 && (
+                {/* Stitched Transcripts Section */}
+                {stitchedTranscripts.sentences.length > 0 && (
                     <div className="mt-6 rounded-xl bg-gray-800 p-6 shadow-xl">
                         <div className="mb-4 flex items-center justify-between">
                             <h3 className="text-2xl font-bold text-green-400">
-                                📝 Transcripts
+                                🧩 Stitched Transcripts
                             </h3>
                             <button
                                 onClick={() =>
-                                    setShowTranscripts(!showTranscripts)
+                                    setShowStitchedTranscripts(
+                                        !showStitchedTranscripts,
+                                    )
                                 }
                                 className="cursor-pointer rounded-lg bg-green-600 px-4 py-2 font-semibold transition hover:bg-green-500"
                             >
-                                {showTranscripts ? "Hide" : "Show"}
+                                {showStitchedTranscripts ? "Hide" : "Show"}
                             </button>
                         </div>
 
-                        {showTranscripts && (
+                        <div
+                            className={`overflow-hidden transition-[max-height,opacity,padding] duration-300 ease-in-out ${
+                                showStitchedTranscripts
+                                    ? "max-h-[2000px] py-2 opacity-100"
+                                    : "max-h-0 py-0 opacity-0"
+                            }`}
+                        >
+                            {/* Show overall stats once */}
+                            <div className="mb-4 text-sm text-gray-400">
+                                Participant Count:{" "}
+                                {stitchedTranscripts.participant_count} |
+                                Sentences: {stitchedTranscripts.sentence_count}{" "}
+                                | Total Words: {stitchedTranscripts.total_words}
+                            </div>
+
+                            {/* Map over sentences */}
+                            <div className="space-y-2">
+                                {stitchedTranscripts.sentences.map(
+                                    (sentence, idx) => (
+                                        <div
+                                            key={idx}
+                                            className="rounded-lg border border-gray-700 bg-gray-900 p-3"
+                                        >
+                                            <div className="mb-1 text-sm text-gray-400">
+                                                Participant:{" "}
+                                                {sentence.participant_id} |{" "}
+                                                {sentence.start.toFixed(1)}s -{" "}
+                                                {sentence.end.toFixed(1)}s
+                                            </div>
+                                            <p className="leading-relaxed text-(--light-gray)">
+                                                {sentence.text}
+                                            </p>
+                                        </div>
+                                    ),
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Transcripts Section */}
+                <div className="mt-6 rounded-xl bg-gray-800 p-6 shadow-xl">
+                    <div className="mb-4 flex items-center justify-between">
+                        <h3 className="text-2xl font-bold text-green-400">
+                            📝 Full Transcripts
+                        </h3>
+                        <button
+                            onClick={() => setShowTranscripts(!showTranscripts)}
+                            className="cursor-pointer rounded-lg bg-green-600 px-4 py-2 font-semibold transition hover:bg-green-500"
+                        >
+                            {showTranscripts ? "Hide" : "Show"}
+                        </button>
+                    </div>
+
+                    <div
+                        className={`overflow-hidden transition-[max-height,opacity,padding] duration-300 ease-in-out ${
+                            showTranscripts
+                                ? "max-h-[2000px] py-2 opacity-100"
+                                : "max-h-0 py-0 opacity-0"
+                        }`}
+                    >
+                        {transcripts.length > 0 ? (
                             <div className="space-y-6">
                                 {transcripts.map((transcript, index) => (
                                     <div
@@ -502,28 +617,27 @@ export default function SyncedRecordingPage() {
                                             <h4 className="text-lg font-semibold text-green-300">
                                                 Participant {index + 1}
                                             </h4>
-                                            <div className="text-(--light-gray)) text-sm">
+                                            <div className="text-sm text-(--light-gray)">
                                                 {transcript.word_count} words |{" "}
                                                 {transcript.language}
                                             </div>
                                         </div>
-                                        <p className="text-(--light-gray)) leading-relaxed">
+                                        <p className="leading-relaxed text-(--light-gray)">
                                             {transcript.transcript ||
                                                 "Transcription in progress..."}
                                         </p>
                                     </div>
                                 ))}
                             </div>
-                        )}
-
-                        {transcripts.length === 0 && (
+                        ) : (
                             <p className="text-center text-(--light-gray)">
                                 Transcripts are being generated... This may take
                                 a few minutes.
                             </p>
                         )}
                     </div>
-                )}
+                </div>
+                <div className="pb-24"/>
             </div>
         </div>
     );
